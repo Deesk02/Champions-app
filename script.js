@@ -815,8 +815,17 @@ function parseCSV(str) {
     return arr;
 }
 
-window.triggerCSVImport = function() {
-    document.getElementById('import-csv-file').click();
+window.triggerCSVImport = function() { document.getElementById('import-csv-file').click(); }
+
+window.toggleCSVMode = function() {
+    const mode = document.getElementById('csv-import-mode').value;
+    if (mode === 'delta') {
+        document.getElementById('csv-mode-delta').style.display = 'block';
+        document.getElementById('csv-mode-full').style.display = 'none';
+    } else {
+        document.getElementById('csv-mode-delta').style.display = 'none';
+        document.getElementById('csv-mode-full').style.display = 'block';
+    }
 }
 
 window.importCSVOverrides = function(event) {
@@ -827,44 +836,39 @@ window.importCSVOverrides = function(event) {
     reader.onload = function(e) {
         const text = e.target.result;
         pendingCSVData = parseCSV(text);
-        
-        if (pendingCSVData.length < 2) {
-            alert("File appears to be empty or missing data rows.");
-            return;
-        }
+        if (pendingCSVData.length < 2) { alert("File appears to be empty or missing data rows."); return; }
 
-        // Get headers (first row)
         const headers = pendingCSVData[0];
         
-        // Populate the dropdown menus so you can map the columns
         const nameSelect = document.getElementById('csv-col-name');
         const addedSelect = document.getElementById('csv-col-added');
         const removedSelect = document.getElementById('csv-col-removed');
+        const startSelect = document.getElementById('csv-col-start');
         
         let optionsHtml = '<option value="-1">-- Skip / Not in Sheet --</option>';
         headers.forEach((header, index) => {
             const safeHeader = header ? header.replace(/"/g, '').trim() : `Column ${index + 1}`;
-            optionsHtml += `<option value="${index}">${safeHeader}</option>`;
+            optionsHtml += `<option value="${index}">Col ${index + 1}: ${safeHeader}</option>`;
         });
         
         nameSelect.innerHTML = optionsHtml;
         addedSelect.innerHTML = optionsHtml;
         removedSelect.innerHTML = optionsHtml;
+        startSelect.innerHTML = optionsHtml;
         
-        // AI Guessing logic - tries to pre-select the columns based on their names!
+        // AI Guessing logic
         headers.forEach((h, i) => {
             if (!h) return;
             const lower = h.toLowerCase();
             if (lower.includes('pokemon') || lower.includes('name')) nameSelect.value = i;
-            if (lower.includes('add') || lower.includes('new') || lower.includes('buff') || lower.includes('learn')) addedSelect.value = i;
+            if (lower.includes('add') || lower.includes('buff') || lower.includes('learn')) addedSelect.value = i;
             if (lower.includes('remove') || lower.includes('lose') || lower.includes('nerf')) removedSelect.value = i;
+            // Guessing where the grid starts for Full Mode
+            if (lower.includes('move 1') || lower.includes('acid spray') || i === 4) startSelect.value = i; 
         });
 
-        // Open the mapping modal
         document.getElementById('csv-map-modal-overlay').style.display = 'block';
         setTimeout(() => document.getElementById('csv-map-modal').classList.add('open'), 10);
-        
-        // Reset the file input so you can select it again later if needed
         document.getElementById('import-csv-file').value = '';
     };
     reader.readAsText(file);
@@ -877,69 +881,79 @@ window.closeCSVMapModal = function() {
 }
 
 window.executeCSVImport = async function() {
+    const mode = document.getElementById('csv-import-mode').value;
     const nameIdx = parseInt(document.getElementById('csv-col-name').value);
-    const addedIdx = parseInt(document.getElementById('csv-col-added').value);
-    const removedIdx = parseInt(document.getElementById('csv-col-removed').value);
     
-    if (nameIdx === -1) {
-        alert("You must select a column for the Pokémon Name!");
-        return;
-    }
+    if (nameIdx === -1) { alert("You must select a column for the Pokémon Name!"); return; }
 
     let importCount = 0;
     if (!offlineOverrides) offlineOverrides = {};
     
-    // Loop through rows (skip the header row)
     for (let i = 1; i < pendingCSVData.length; i++) {
         const row = pendingCSVData[i];
-        // Skip empty rows
         if (!row || row.length <= nameIdx || !row[nameIdx]) continue;
         
-        // Format the name so it matches PokeAPI (e.g. "Iron Bundle" -> "iron-bundle")
         const pkmnName = row[nameIdx].toLowerCase().trim().replace(/ /g, '-').replace(/'/g, '');
-        
         const targetPkmn = offlineDatabase.find(p => p.name === pkmnName || p.name.startsWith(pkmnName + '-'));
         
         if (targetPkmn) {
             if (!offlineOverrides[targetPkmn.id]) offlineOverrides[targetPkmn.id] = { added: [], removed: [] };
             let rowModified = false;
-            
-            // Handle Added Moves
-            if (addedIdx !== -1 && row[addedIdx]) {
-                // Split by comma in case they put multiple moves in one cell
-                const addedMoves = row[addedIdx].split(',').map(m => m.toLowerCase().trim().replace(/ /g, '-').replace(/'/g, '')).filter(Boolean);
-                addedMoves.forEach(m => {
-                    if (!offlineOverrides[targetPkmn.id].added.includes(m)) offlineOverrides[targetPkmn.id].added.push(m);
-                    // Make sure the move gets taken off the 'removed' list if it was there
-                    offlineOverrides[targetPkmn.id].removed = offlineOverrides[targetPkmn.id].removed.filter(x => x !== m);
+
+            if (mode === 'delta') {
+                const addedIdx = parseInt(document.getElementById('csv-col-added').value);
+                const removedIdx = parseInt(document.getElementById('csv-col-removed').value);
+                
+                if (addedIdx !== -1 && row[addedIdx]) {
+                    const addedMoves = row[addedIdx].split(',').map(m => m.toLowerCase().trim().replace(/ /g, '-').replace(/'/g, '')).filter(Boolean);
+                    addedMoves.forEach(m => {
+                        if (!offlineOverrides[targetPkmn.id].added.includes(m)) offlineOverrides[targetPkmn.id].added.push(m);
+                        offlineOverrides[targetPkmn.id].removed = offlineOverrides[targetPkmn.id].removed.filter(x => x !== m);
+                        rowModified = true;
+                    });
+                }
+                
+                if (removedIdx !== -1 && row[removedIdx]) {
+                    const removedMoves = row[removedIdx].split(',').map(m => m.toLowerCase().trim().replace(/ /g, '-').replace(/'/g, '')).filter(Boolean);
+                    removedMoves.forEach(m => {
+                        if (!offlineOverrides[targetPkmn.id].removed.includes(m)) offlineOverrides[targetPkmn.id].removed.push(m);
+                        offlineOverrides[targetPkmn.id].added = offlineOverrides[targetPkmn.id].added.filter(x => x !== m);
+                        rowModified = true;
+                    });
+                }
+            } else if (mode === 'full') {
+                const startIdx = parseInt(document.getElementById('csv-col-start').value);
+                if (startIdx === -1) { alert("You must select the Start of Moves column!"); return; }
+
+                let incomingMoves = [];
+                for(let j = startIdx; j < row.length; j++) {
+                    if(row[j] && row[j].trim() !== '') {
+                        incomingMoves.push(row[j].toLowerCase().trim().replace(/ /g, '-').replace(/'/g, ''));
+                    }
+                }
+
+                // Calculate exact delta by comparing to base API
+                const baseMoves = targetPkmn.moves.map(m => m.name);
+                const newAdded = incomingMoves.filter(m => !baseMoves.includes(m));
+                const newRemoved = baseMoves.filter(m => !incomingMoves.includes(m));
+
+                if (newAdded.length > 0 || newRemoved.length > 0) {
+                    offlineOverrides[targetPkmn.id].added = newAdded;
+                    offlineOverrides[targetPkmn.id].removed = newRemoved;
                     rowModified = true;
-                });
-            }
-            
-            // Handle Removed Moves
-            if (removedIdx !== -1 && row[removedIdx]) {
-                const removedMoves = row[removedIdx].split(',').map(m => m.toLowerCase().trim().replace(/ /g, '-').replace(/'/g, '')).filter(Boolean);
-                removedMoves.forEach(m => {
-                    if (!offlineOverrides[targetPkmn.id].removed.includes(m)) offlineOverrides[targetPkmn.id].removed.push(m);
-                    // Make sure the move gets taken off the 'added' list if it was there
-                    offlineOverrides[targetPkmn.id].added = offlineOverrides[targetPkmn.id].added.filter(x => x !== m);
-                    rowModified = true;
-                });
+                }
             }
             
             if (rowModified) importCount++;
         }
     }
     
-    // Save your custom datamine straight to the IndexedDB!
     await saveToDB('overrides', offlineOverrides);
-    alert(`Successfully imported moveset overrides for ${importCount} Pokémon!`);
-    
+    alert(`Successfully calculated and imported moveset overrides for ${importCount} Pokémon!`);
     closeCSVMapModal();
     
-    // Auto-refresh the screen if you are looking at a Pokemon
     if (window.currentDetailedPokemon) {
-        renderPokemonMoves(window.currentDetailedPokemon);
+        renderPokemonMoves(window.currentDetailedPokemon, document.getElementById('detail-version-select').value);
         if (typeof renderLearnsetCurrentMoves === 'function') renderLearnsetCurrentMoves();
     }
 }

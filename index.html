@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-      <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#212121">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Champions Team Builder</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#212121">
 </head>
 <body>
     <header id="main-header">
@@ -181,16 +181,30 @@
     <div id="csv-map-modal-overlay" class="modal-overlay" style="z-index: 8000;">
         <div id="csv-map-modal" class="bottom-modal" style="height: auto; display: flex; flex-direction: column;">
             <h3 style="margin-top: 0; color: #2196F3; text-align: center;">Map CSV Columns</h3>
-            <p style="text-align: center; color: #aaa; font-size: 12px;">Select which columns in your spreadsheet match the required data.</p>
+            <p style="text-align: center; color: #aaa; font-size: 12px; margin-top: -5px;">Select which columns in your spreadsheet match the required data.</p>
             
+            <label style="margin-bottom: 5px; font-weight: bold; color: #fff;">Import Mode:</label>
+            <select id="csv-import-mode" class="modal-input" style="margin-bottom: 15px;" onchange="toggleCSVMode()">
+                <option value="delta">Added & Removed Columns (Comma Separated)</option>
+                <option value="full" selected>Full Learnset Grid (1 Move per Column)</option>
+            </select>
+
             <label style="margin-bottom: 5px; font-weight: bold; color: #fff;">Pokémon Name Column:</label>
             <select id="csv-col-name" class="modal-input" style="margin-bottom: 15px;"></select>
             
-            <label style="margin-bottom: 5px; font-weight: bold; color: #4CAF50;">Added Moves Column (Optional):</label>
-            <select id="csv-col-added" class="modal-input" style="margin-bottom: 15px;"></select>
-            
-            <label style="margin-bottom: 5px; font-weight: bold; color: #f44336;">Removed Moves Column (Optional):</label>
-            <select id="csv-col-removed" class="modal-input" style="margin-bottom: 15px;"></select>
+            <div id="csv-mode-delta" style="display: none;">
+                <label style="margin-bottom: 5px; font-weight: bold; color: #4CAF50;">Added Moves Column:</label>
+                <select id="csv-col-added" class="modal-input" style="margin-bottom: 15px;"></select>
+                
+                <label style="margin-bottom: 5px; font-weight: bold; color: #f44336;">Removed Moves Column:</label>
+                <select id="csv-col-removed" class="modal-input" style="margin-bottom: 15px;"></select>
+            </div>
+
+            <div id="csv-mode-full" style="display: block;">
+                <label style="margin-bottom: 5px; font-weight: bold; color: #9c27b0;">Start of Moves Column:</label>
+                <p style="font-size: 11px; color: #aaa; margin-top: -3px; margin-bottom: 5px;">Select the FIRST column where the moves begin. The app will read all columns to the right of this as valid moves.</p>
+                <select id="csv-col-start" class="modal-input" style="margin-bottom: 15px;"></select>
+            </div>
             
             <button onclick="executeCSVImport()" style="margin-top: 10px; width: 100%; padding: 15px; background: #2196F3; color: #fff; border: none; border-radius: 10px; font-weight: bold; font-size: 16px;">Run Import</button>
             <button onclick="closeCSVMapModal()" class="modal-cancel-btn">Cancel</button>
@@ -307,7 +321,8 @@
     </div>
 
     <script src="script.js"></script>
-        <script>
+    
+    <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('sw.js')
@@ -316,6 +331,5 @@
         });
       }
     </script>
-
 </body>
 </html>
