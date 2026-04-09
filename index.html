@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+      <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#212121">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Champions Team Builder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header id="main-header">
+        <button id="menu-toggle">☰</button>
+        <h1 id="header-title">Pokédex</h1>
+        <span class="header-icon">★</span>
+        <span class="header-icon">✔</span>
+        <span class="header-icon" id="settings-btn" style="cursor: pointer; padding: 0 5px;">⋮</span>
+    </header>
+
+    <div id="settings-menu" style="display: none; position: fixed; top: 50px; right: 16px; background: #2d2d2d; border: 1px solid #444; border-radius: 8px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 3000; flex-direction: column; gap: 12px; min-width: 220px;">
+        <h4 style="margin: 0 0 5px 0; color: #aaa; font-size: 12px; text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 5px;">Form Filters</h4>
+        <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; color: #fff;">
+            <input type="checkbox" id="toggle-regional" checked style="width: 16px; height: 16px;"> Show Regional Forms
+        </label>
+        <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; color: #fff;">
+            <input type="checkbox" id="toggle-mega" checked style="width: 16px; height: 16px;"> Show Mega Evolutions
+        </label>
+        <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; color: #fff;">
+            <input type="checkbox" id="toggle-gmax" checked style="width: 16px; height: 16px;"> Show Gigantamax
+        </label>
+        <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; color: #fff;">
+            <input type="checkbox" id="toggle-alt" checked style="width: 16px; height: 16px;"> Show Other Alt Forms
+        </label>
+    </div>
+
+    <div id="drawer-overlay"></div>
+    <nav id="nav-drawer">
+        <div id="drawer-header">
+            <h2 id="drawer-title">dataDex</h2>
+            <p id="drawer-subtitle">Champions Edition</p>
+        </div>
+        <button class="drawer-btn active" id="tab-pokemon-btn"><span>◓</span> Pokédex</button>
+        <button class="drawer-btn" id="tab-abilities-btn"><span>✦</span> Abilities</button>
+        <button class="drawer-btn" id="tab-moves-btn"><span>⚔</span> Moves</button>
+        <button class="drawer-btn" id="tab-items-btn"><span>🎒</span> Items</button>
+        <button class="drawer-btn" id="tab-teambuilder-btn"><span>⊕</span> Team Builder</button>
+        
+        <div class="update-btn-group">
+            <p><strong>Database Controls (Internet req.)</strong></p>
+            <p>Status: <span id="status">...</span></p>
+            <div id="sync-progress-container" style="display: none; height: 8px; background: #444; border-radius: 4px; margin-bottom: 10px; overflow: hidden;">
+                <div id="sync-progress-bar" style="width: 0%; height: 100%; background: #4caf50; transition: width 0.1s linear;"></div>
+            </div>
+            <button id="sync-all-btn">⟳ Sync All Data</button>
+            
+            <button id="import-csv-btn" onclick="triggerCSVImport()" style="margin-top: 10px; color: #2196F3;">📥 Import Movesets (CSV)</button>
+            <input type="file" id="import-csv-file" accept=".csv" style="display: none;" onchange="importCSVOverrides(event)">
+        </div>
+    </nav>
+
+    <main id="content-area">
+        <div id="view-pokemon" class="active">
+            <div style="position: relative; margin-bottom: 10px;">
+                <input type="text" id="tag-input" autocomplete="off" placeholder="Quick search... (Press Enter to lock tag)" style="width: 100%; padding: 10px; font-size: 16px; background: #333; border: 1px solid #444; color: #fff; border-radius: 5px;">
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <button id="btn-filter-regulation" class="top-filter-btn" onclick="openTopFilterModal('regulation-modal')">Any Regulation <span>▼</span></button>
+                <button id="btn-filter-type" class="top-filter-btn" onclick="openTopFilterModal('type-modal')">All Types <span>▼</span></button>
+            </div>
+
+            <div id="active-tags"></div>
+            <div id="search-results"></div>
+        </div>
+
+        <div id="view-abilities">
+            <input type="text" id="ability-search" placeholder="Search abilities..." style="width: 100%; padding: 10px; font-size: 16px; background: #333; color: #fff; border: 1px solid #444; border-radius: 5px; margin-bottom: 15px;">
+            <div id="ability-results"></div>
+        </div>
+
+        <div id="view-moves">
+            <input type="text" id="moves-search" placeholder="Search moves..." style="width: 100%; padding: 10px; font-size: 16px; background: #333; color: #fff; border: 1px solid #444; border-radius: 5px; margin-bottom: 15px;">
+            <div id="moves-results"></div>
+        </div>
+        
+        <div id="view-items">
+            <input type="text" id="items-search" placeholder="Search items..." style="width: 100%; padding: 10px; font-size: 16px; background: #333; color: #fff; border: 1px solid #444; border-radius: 5px; margin-bottom: 15px;">
+            <div id="items-results"></div>
+        </div>
+
+        <div id="view-teambuilder">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 5px;">
+                <input type="text" id="team-name-input" placeholder="Team Name..." style="background: #333; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 5px; flex-grow: 1; font-size: 14px;">
+                <button onclick="saveCurrentTeam()" style="background: #4CAF50; color: #fff; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer;">Save</button>
+                <button onclick="openTeamManagerModal()" style="background: #2196F3; color: #fff; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer;">Load</button>
+                <button onclick="clearTeam()" style="background: #f44336; color: #fff; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer;">Clear</button>
+            </div>
+            <div id="team-grid">
+                <div class="team-slot" id="slot-1"><span class="slot-icon">⊕</span><span>Add Member</span></div>
+                <div class="team-slot" id="slot-2"><span class="slot-icon">⊕</span><span>Add Member</span></div>
+                <div class="team-slot" id="slot-3"><span class="slot-icon">⊕</span><span>Add Member</span></div>
+                <div class="team-slot" id="slot-4"><span class="slot-icon">⊕</span><span>Add Member</span></div>
+                <div class="team-slot" id="slot-5"><span class="slot-icon">⊕</span><span>Add Member</span></div>
+                <div class="team-slot" id="slot-6"><span class="slot-icon">⊕</span><span>Add Member</span></div>
+            </div>
+        </div>
+    </main>
+
+    <div id="fab-container"><button class="fab-main" id="fab-toggle">＋</button><div class="fab-menu" id="fab-menu"><div class="fab-item-container"><span class="fab-label">Sort by...</span><button class="fab-sub" id="fab-btn-sort">⇕</button></div><div class="fab-item-container"><span class="fab-label">Filter by Ability</span><button class="fab-sub" id="fab-btn-ability">✦</button></div><div class="fab-item-container"><span class="fab-label">Filter by Move</span><button class="fab-sub" id="fab-btn-move">⚔</button></div><div class="fab-item-container"><span class="fab-label">Master Dictionary</span><button class="fab-sub" id="fab-btn-search">🔍</button></div></div></div>
+    
+    <div id="sort-modal-overlay" class="modal-overlay"><div id="sort-modal" class="bottom-modal"><h3 style="margin-top: 0; color: #f44336; text-align: center;">Sort By...</h3><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><button class="sort-btn active" data-sort="id">Pokédex #</button><button class="sort-btn" data-sort="name">Name (A-Z)</button><button class="sort-btn" data-sort="total">Total Stats</button><button class="sort-btn" data-sort="hp">HP</button><button class="sort-btn" data-sort="attack">Attack</button><button class="sort-btn" data-sort="defense">Defense</button><button class="sort-btn" data-sort="spAtk">Sp. Atk</button><button class="sort-btn" data-sort="spDef">Sp. Def</button><button class="sort-btn" data-sort="speed" style="grid-column: span 2;">Speed</button></div><div class="sort-dir-container"><button class="sort-dir-btn active" id="sort-asc">Ascending</button><button class="sort-dir-btn" id="sort-desc">Descending</button></div><button id="close-sort-modal" class="modal-cancel-btn">Cancel</button></div></div>
+    <div id="move-modal-overlay" class="modal-overlay"><div id="move-modal" class="bottom-modal"><h3 style="margin-top: 0; color: #9c27b0; text-align: center;">Filter by Move</h3><div style="position: relative;"><input type="text" id="move-filter-input" placeholder="Type a move name..." autocomplete="off" class="modal-input"><div id="move-filter-suggestions" class="autocomplete-dropdown"></div></div><button id="close-move-modal" class="modal-cancel-btn">Cancel</button></div></div>
+    <div id="ability-modal-overlay" class="modal-overlay"><div id="ability-modal" class="bottom-modal"><h3 style="margin-top: 0; color: #ff9800; text-align: center;">Filter by Ability</h3><div style="position: relative;"><input type="text" id="ability-filter-input" placeholder="Type an ability name..." autocomplete="off" class="modal-input"><div id="ability-filter-suggestions" class="autocomplete-dropdown"></div></div><button id="close-ability-modal" class="modal-cancel-btn">Cancel</button></div></div>
+    <div id="tag-modal-overlay" class="modal-overlay"><div id="tag-modal" class="bottom-modal"><h3 style="margin-top: 0; color: #2196F3; text-align: center;">Master Dictionary</h3><div style="position: relative;"><input type="text" id="tag-filter-input" placeholder="Search any Pokémon, Move, or Ability..." autocomplete="off" class="modal-input"><div id="tag-filter-suggestions" class="autocomplete-dropdown"></div></div><button id="close-tag-modal" class="modal-cancel-btn">Cancel</button></div></div>
+
+    <div id="type-modal-overlay" class="modal-overlay"><div id="type-modal" class="bottom-modal" style="max-height: 80vh; overflow-y: auto;"><h3 style="margin-top: 0; color: #fff; text-align: center;">Select Type</h3><div id="filter-type-list"></div><button onclick="closeTopFilterModals()" class="modal-cancel-btn">Cancel</button></div></div>
+    <div id="regulation-modal-overlay" class="modal-overlay"><div id="regulation-modal" class="bottom-modal" style="max-height: 80vh; overflow-y: auto;"><h3 style="margin-top: 0; color: #fff; text-align: center;">Active Regulation</h3><div id="regulation-list-container"></div><button onclick="openRegulationManager()" style="margin-top: 10px; width: 100%; padding: 15px; background: #2196F3; color: #fff; border: none; border-radius: 10px; font-weight: bold;">Manage Regulations</button><button onclick="closeTopFilterModals()" class="modal-cancel-btn">Cancel</button></div></div>
+
+    <div id="regulation-manager-overlay" class="modal-overlay" style="z-index: 7000;">
+        <div id="regulation-manager-modal" class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0; color: #4CAF50; text-align: center; flex-shrink: 0;" id="reg-manager-title">Regulations</h3>
+            
+            <div id="reg-manager-main" style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; min-height: 0;">
+                <button onclick="createNewRegulation()" style="width: 100%; padding: 12px; background: #4CAF50; color: #fff; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 10px; flex-shrink: 0;">+ Create New Regulation</button>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-shrink: 0;">
+                    <button onclick="exportRegulations()" style="flex: 1; padding: 10px; background: #FF9800; color: #fff; border: none; border-radius: 8px; font-weight: bold; font-size: 14px;">📤 Export Backup</button>
+                    <button onclick="triggerImport()" style="flex: 1; padding: 10px; background: #2196F3; color: #fff; border: none; border-radius: 8px; font-weight: bold; font-size: 14px;">📥 Import JSON</button>
+                </div>
+                <input type="file" id="import-reg-file" accept=".json" style="display: none;" onchange="importRegulations(event)">
+
+                <div id="reg-manager-list" style="overflow-y: auto; flex-grow: 1; overscroll-behavior: contain;"></div>
+            </div>
+            
+            <div id="reg-editor-main" style="display: none; flex-direction: column; flex-grow: 1; overflow: hidden; min-height: 0;">
+                <input type="text" id="reg-edit-name" placeholder="Regulation Name (e.g., Season 1)" class="modal-input" style="margin-bottom: 10px; flex-shrink: 0;">
+                <div style="display: flex; gap: 5px; margin-bottom: 10px; flex-shrink: 0;">
+                    <button class="move-cat-btn active" id="reg-tab-pkmn">Pokémon</button>
+                    <button class="move-cat-btn" id="reg-tab-items">Items</button>
+                </div>
+                <button onclick="openMasterListModal()" style="width: 100%; padding: 12px; background: #9c27b0; color: #fff; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 10px; flex-shrink: 0;">+ Select from Master List</button>
+                
+                <div id="reg-edit-chips" style="display: flex; flex-wrap: wrap; gap: 5px; overflow-y: auto; flex-grow: 1; align-content: flex-start; background: #222; padding: 10px; border-radius: 8px; border: 1px solid #444; min-height: 0; overscroll-behavior: contain;"></div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px; flex-shrink: 0;">
+                    <button onclick="saveRegulation()" style="flex: 1; padding: 12px; background: #4CAF50; color: #fff; border: none; border-radius: 8px; font-weight: bold;">Save</button>
+                    <button onclick="closeRegulationEditor()" style="flex: 1; padding: 12px; background: #f44336; color: #fff; border: none; border-radius: 8px; font-weight: bold;">Back</button>
+                </div>
+            </div>
+            
+            <button onclick="closeRegulationManagerModal()" class="modal-cancel-btn" id="reg-manager-close-btn" style="flex-shrink: 0;">Close</button>
+        </div>
+    </div>
+
+    <div id="master-list-modal-overlay" class="modal-overlay" style="z-index: 7500;">
+        <div id="master-list-modal" class="bottom-modal" style="height: 95vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0;">
+                <h3 style="margin: 0; color: #2196F3;" id="master-list-title">Master List</h3>
+                <button onclick="closeMasterListModal()" style="background: #4CAF50; color: #fff; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer;">Done</button>
+            </div>
+            <input type="text" id="master-list-search" placeholder="Search by name or ID..." class="modal-input" autocomplete="off" style="margin-bottom: 10px; flex-shrink: 0;">
+            
+            <div id="master-list-grid" style="flex-grow: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; align-content: flex-start; padding-bottom: 20px; min-height: 0; overscroll-behavior: contain;">
+                </div>
+        </div>
+    </div>
+
+    <div id="learnset-modal-overlay" class="modal-overlay" style="z-index: 6500;">
+        <div id="learnset-modal" class="bottom-modal" style="height: 85vh; display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0; color: #e91e63; text-align: center;">Edit Learnset</h3>
+            <p style="text-align: center; color: #aaa; font-size: 12px; margin-top: -10px;">Overrides local DB for <span id="learnset-target-name" style="color:#fff; font-weight:bold;"></span></p>
+            <input type="text" id="learnset-search" placeholder="Search move to add..." class="modal-input" autocomplete="off" style="margin-bottom: 10px;">
+            <div id="learnset-suggestions" class="autocomplete-dropdown" style="position: static; max-height: 150px; display: none; margin-bottom: 10px;"></div>
+            <h4 style="margin: 10px 0 5px 0; color: #fff; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 5px;">Current Custom Learnset</h4>
+            <div id="learnset-current-moves" style="overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 5px;"></div>
+            <button onclick="saveLearnsetOverrides()" style="margin-top: 15px; width: 100%; padding: 15px; background: #4CAF50; color: #fff; border: none; border-radius: 10px; font-weight: bold;">Save Overrides</button>
+            <button onclick="closeLearnsetModal()" class="modal-cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <div id="csv-map-modal-overlay" class="modal-overlay" style="z-index: 8000;">
+        <div id="csv-map-modal" class="bottom-modal" style="height: auto; display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0; color: #2196F3; text-align: center;">Map CSV Columns</h3>
+            <p style="text-align: center; color: #aaa; font-size: 12px;">Select which columns in your spreadsheet match the required data.</p>
+            
+            <label style="margin-bottom: 5px; font-weight: bold; color: #fff;">Pokémon Name Column:</label>
+            <select id="csv-col-name" class="modal-input" style="margin-bottom: 15px;"></select>
+            
+            <label style="margin-bottom: 5px; font-weight: bold; color: #4CAF50;">Added Moves Column (Optional):</label>
+            <select id="csv-col-added" class="modal-input" style="margin-bottom: 15px;"></select>
+            
+            <label style="margin-bottom: 5px; font-weight: bold; color: #f44336;">Removed Moves Column (Optional):</label>
+            <select id="csv-col-removed" class="modal-input" style="margin-bottom: 15px;"></select>
+            
+            <button onclick="executeCSVImport()" style="margin-top: 10px; width: 100%; padding: 15px; background: #2196F3; color: #fff; border: none; border-radius: 10px; font-weight: bold; font-size: 16px;">Run Import</button>
+            <button onclick="closeCSVMapModal()" class="modal-cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <div id="team-edit-overlay" class="modal-overlay">
+        <div id="team-edit-modal" class="bottom-modal" style="height: 85vh; overflow-y: auto; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img id="edit-sprite" src="" style="width: 60px; height: 60px; background: rgba(255,255,255,0.1); border-radius: 50%;">
+                    <h3 id="edit-name" style="margin: 0; text-transform: capitalize; color: #fff; font-size: 24px;">Name</h3>
+                </div>
+                <button onclick="removeTeamMember()" style="background: #f44336; color: #fff; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer;">Remove</button>
+            </div>
+            <div class="edit-section-title">Ability</div>
+            <div style="display: flex; gap: 8px;">
+                <select id="edit-ability" class="edit-btn" style="flex-grow: 1; appearance: none; outline: none; margin-bottom: 8px;"></select>
+                <button onclick="showAbilityInfo()" style="background: #444; border: 1px solid #555; color: #fff; padding: 0 15px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 8px; font-size: 18px;">ⓘ</button>
+            </div>
+            <div class="edit-section-title">Held Item</div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <button class="edit-btn" onclick="openItemSelectModal()" style="flex-grow: 1; margin-bottom: 0;">Held Item: <span id="edit-item" style="color: #00bcd4; font-weight: bold;">None</span></button>
+                <button onclick="showItemInfo()" style="background: #444; border: 1px solid #555; color: #fff; padding: 0 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 18px;">ⓘ</button>
+            </div>
+            <div class="edit-section-title">Moves</div>
+            <div class="edit-move-grid">
+                <button class="edit-move-btn" onclick="openMoveSelectModal(0)" id="edit-move-1">Select Move</button>
+                <button class="edit-move-btn" onclick="openMoveSelectModal(1)" id="edit-move-2">Select Move</button>
+                <button class="edit-move-btn" onclick="openMoveSelectModal(2)" id="edit-move-3">Select Move</button>
+                <button class="edit-move-btn" onclick="openMoveSelectModal(3)" id="edit-move-4">Select Move</button>
+            </div>
+            <button onclick="closeTeamEditModal()" style="margin-top: auto; width: 100%; padding: 15px; background: #2196F3; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 20px;">Save Changes</button>
+        </div>
+    </div>
+    <div id="team-manager-overlay" class="modal-overlay" style="z-index: 7000;">
+        <div id="team-manager-modal" class="bottom-modal" style="height: 80vh; display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0; color: #4CAF50; text-align: center;">Saved Teams</h3>
+            <div id="team-manager-list" style="flex-grow: 1; overflow-y: auto;"></div>
+            <button onclick="closeTeamManagerModal()" class="modal-cancel-btn">Close</button>
+        </div>
+    </div>
+    <div id="item-select-modal-overlay" class="modal-overlay" style="z-index: 6000;">
+        <div id="item-select-modal" class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0; color: #00bcd4; text-align: center;">Select Held Item</h3>
+            <input type="text" id="item-select-search" placeholder="Search items..." autocomplete="off" class="modal-input" style="margin-bottom: 10px;">
+            <div id="item-select-list" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;"></div>
+            <button onclick="closeItemSelectModal()" class="modal-cancel-btn">Cancel</button>
+        </div>
+    </div>
+    <div id="move-select-modal-overlay" class="modal-overlay" style="z-index: 6000;">
+        <div id="move-select-modal" class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0; color: #9c27b0; text-align: center;">Select Move</h3>
+            <input type="text" id="move-select-search" placeholder="Search moves..." autocomplete="off" class="modal-input" style="margin-bottom: 10px;">
+            <div id="move-select-list" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;"></div>
+            <button onclick="closeMoveSelectModal()" class="modal-cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <div id="view-details">
+        <div id="detail-header" class="type-normal">
+            <div>
+                <button id="detail-back-btn" onclick="closeDetailedView()">← Back</button>
+                <h2 id="detail-name">Pokemon</h2>
+                <div id="detail-types" style="margin-top: 10px;"></div>
+            </div>
+            <div style="text-align: right;">
+                <span id="detail-id">#000</span>
+                <img id="detail-sprite" src="">
+            </div>
+        </div>
+        <div id="detail-content" style="padding: 20px; padding-bottom: 80px;">
+            <div id="detail-tab-info">
+                <div style="background: #2a2a2a; border-radius: 15px; padding: 15px; margin-bottom: 15px;">
+                    <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 5px;">Base Stats</h3>
+                    <div id="detail-stats"></div>
+                </div>
+                <div style="background: #2a2a2a; border-radius: 15px; padding: 15px; margin-bottom: 15px;">
+                    <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 5px;">Abilities</h3>
+                    <div id="detail-abilities"></div>
+                </div>
+                <div id="detail-evo-container" style="display: none; background: #2a2a2a; border-radius: 15px; padding: 15px; margin-bottom: 15px;">
+                    <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 5px;">Evolution Line</h3>
+                    <div id="detail-evo-list" class="evo-scroll-container"></div>
+                </div>
+                <div id="detail-forms-container" style="display: none; background: #2a2a2a; border-radius: 15px; padding: 15px; margin-bottom: 15px;">
+                    <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 5px;">Alternate Forms</h3>
+                    <div id="detail-forms-list" class="evo-scroll-container"></div>
+                </div>
+            </div>
+            <div id="detail-tab-moves" style="display: none;">
+                <button onclick="openLearnsetModal()" style="width: 100%; padding: 12px; background: #e91e63; color: #fff; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; font-size: 16px;">✎ Edit Base Learnset</button>
+                <div style="display: flex; gap: 5px; margin-bottom: 15px;">
+                    <button class="move-cat-btn active" data-method="level-up">Level / Base</button>
+                    <button class="move-cat-btn" data-method="machine">TM/HM</button>
+                    <button class="move-cat-btn" data-method="egg">Egg</button>
+                    <button class="move-cat-btn" data-method="tutor">Tutor</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; font-size: 12px; color: #aaa; padding-left: 5px; padding-right: 5px;">
+                    <span style="flex: 0.5;" id="move-col-header">Lv.</span>
+                    <span style="flex: 1.5;">Move</span>
+                    <span style="flex: 1; text-align: center;">Pwr</span>
+                    <span style="flex: 1; text-align: center;">Acc</span>
+                    <span style="flex: 1; text-align: right;">PP</span>
+                </div>
+                <div id="detail-moves-list"></div>
+            </div>
+        </div>
+        <div id="detail-nav">
+            <button class="detail-nav-btn active" id="detail-nav-info"><span class="detail-nav-icon">ⓘ</span> Info</button>
+            <button class="detail-nav-btn" id="detail-nav-moves"><span class="detail-nav-icon">⚔</span> Moves</button>
+            <button class="detail-nav-btn" onclick="alert('Damage Calculator coming later!')"><span class="detail-nav-icon">📊</span> Damage</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+        <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker Registered!', reg))
+            .catch(err => console.error('Service Worker Registration Failed!', err));
+        });
+      }
+    </script>
+
+</body>
+</html>
