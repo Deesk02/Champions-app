@@ -793,7 +793,7 @@ if (closeTagModalBtn) closeTagModalBtn.addEventListener('click', closeTagModal);
 if (tagModalOverlay) tagModalOverlay.addEventListener('click', (e) => { if (e.target === tagModalOverlay) closeTagModal(); });
 tagFilterInput.addEventListener('input', (e) => { const val = e.target.value.toLowerCase().trim(); tagFilterSuggestions.innerHTML = ''; if (val.length === 0) { tagFilterSuggestions.style.display = 'none'; return; } const matches = masterSearchList.filter(item => item.text.toLowerCase().includes(val)).slice(0, 30); if (matches.length > 0) { tagFilterSuggestions.style.display = 'block'; matches.forEach(match => { const div = document.createElement('div'); div.style.cssText = 'padding: 12px 10px; border-bottom: 1px solid #555; cursor: pointer; display: flex; justify-content: space-between; align-items: center; color: #fff;'; div.innerHTML = `<span style="text-transform: capitalize;">${match.text}</span> <span style="font-size: 12px; color: #aaa; background: #222; padding: 2px 6px; border-radius: 4px;">${match.label}</span>`; div.onclick = () => { addTag(match.tag); closeTagModal(); }; tagFilterSuggestions.appendChild(div); }); } else { tagFilterSuggestions.style.display = 'none'; } });
 
-// --- M. SMART CSV DATAMINE IMPORTER ---
+// --- M. SMART CSV & MHT DATAMINE IMPORTER ---
 let pendingCSVData = [];
 
 function parseCSV(str) {
@@ -834,8 +834,54 @@ window.importCSVOverrides = function(event) {
     const reader = new FileReader();
     
     reader.onload = function(e) {
-        const text = e.target.result;
-        pendingCSVData = parseCSV(text);
+        let text = e.target.result;
+        pendingCSVData = [];
+
+        // NEW: Offline MHT/MHTML Parser!
+        if (file.name.toLowerCase().endsWith('.mht') || file.name.toLowerCase().endsWith('.mhtml')) {
+            let htmlPart = text;
+            const docMatch = text.match(/<html[\s\S]*?<\/html>/i);
+            if (docMatch) htmlPart = docMatch[0];
+            
+            // Clean up MHT formatting artifacts
+            htmlPart = htmlPart.replace(/=\r\n/g, '').replace(/=\n/g, '');
+            
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlPart, 'text/html');
+            
+            const allTables = Array.from(doc.querySelectorAll('table'));
+            if (allTables.length > 0) {
+                // Mathematically isolate the massive data grid
+                const biggestTable = allTables.reduce((a, b) => a.querySelectorAll('tr').length > b.querySelectorAll('tr').length ? a : b);
+                const rows = biggestTable.querySelectorAll('tr');
+                
+                rows.forEach(row => {
+                    let cols = row.querySelectorAll('td, th');
+                    let rowData = [];
+                    let textCount = 0;
+                    
+                    cols.forEach(col => {
+                        let cellText = (col.innerText || col.textContent || "").trim();
+                        cellText = cellText.replace(/=3D/g, '='); // Decode MHT equals signs
+                        if (cellText.length > 0) textCount++;
+                        rowData.push(cellText);
+                    });
+                    
+                    // Only keep rows with actual data to ignore the menus
+                    if (textCount >= 2) {
+                        pendingCSVData.push(rowData);
+                    }
+                });
+            }
+            
+            if (pendingCSVData.length < 2) {
+                alert("Could not extract the table from this MHT file. Make sure it was saved while viewing the Learnset tab!");
+                return;
+            }
+        } else {
+            pendingCSVData = parseCSV(text);
+        }
+
         if (pendingCSVData.length < 2) { alert("File appears to be empty or missing data rows."); return; }
 
         const headers = pendingCSVData[0];
@@ -863,7 +909,6 @@ window.importCSVOverrides = function(event) {
             if (lower.includes('pokemon') || lower.includes('name')) nameSelect.value = i;
             if (lower.includes('add') || lower.includes('buff') || lower.includes('learn')) addedSelect.value = i;
             if (lower.includes('remove') || lower.includes('lose') || lower.includes('nerf')) removedSelect.value = i;
-            // Guessing where the grid starts for Full Mode
             if (lower.includes('move 1') || lower.includes('acid spray') || i === 4) startSelect.value = i; 
         });
 
@@ -933,7 +978,7 @@ window.executeCSVImport = async function() {
                 }
 
                 // Calculate exact delta by comparing to base API
-                const baseMoves = targetPkmn.moves.map(m => m.name);
+                const baseMoves = targetPkmn.moves.map(m => m.name || m);
                 const newAdded = incomingMoves.filter(m => !baseMoves.includes(m));
                 const newRemoved = baseMoves.filter(m => !incomingMoves.includes(m));
 
@@ -953,11 +998,10 @@ window.executeCSVImport = async function() {
     closeCSVMapModal();
     
     if (window.currentDetailedPokemon) {
-        renderPokemonMoves(window.currentDetailedPokemon, document.getElementById('detail-version-select').value);
+        renderPokemonMoves(window.currentDetailedPokemon);
         if (typeof renderLearnsetCurrentMoves === 'function') renderLearnsetCurrentMoves();
     }
 }
-
 
 
 // --- INIT ---
