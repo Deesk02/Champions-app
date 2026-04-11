@@ -297,15 +297,17 @@
             </div>
             <div id="detail-tab-moves" style="display: none;">
                 <button onclick="openLearnsetModal()" style="width: 100%; padding: 12px; background: #e91e63; color: #fff; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; font-size: 16px;">✎ Edit Base Learnset</button>
-                <div style="display: flex; gap: 5px; margin-bottom: 15px;">
-                    <button class="move-cat-btn active" data-method="level-up">Level / Base</button>
-                    <button class="move-cat-btn" data-method="machine">TM/HM</button>
-                    <button class="move-cat-btn" data-method="egg">Egg</button>
-                    <button class="move-cat-btn" data-method="tutor">Tutor</button>
+                
+                <div style="margin-bottom: 15px; background: #2a2a2a; padding: 10px; border-radius: 10px; border: 1px solid #444;">
+                    <label style="font-size: 11px; color: #aaa; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; display: block;">Moveset Version</label>
+                    <select id="detail-version-select" class="modal-input" style="padding: 10px; background: #1a1a1a;" onchange="if(window.currentDetailedPokemon) renderPokemonMoves(window.currentDetailedPokemon)">
+                        <option value="edited" selected>Champions Custom (Edited)</option>
+                        <option value="original">Original Base Game</option>
+                    </select>
                 </div>
+
                 <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; font-size: 12px; color: #aaa; padding-left: 5px; padding-right: 5px;">
-                    <span style="flex: 0.5;" id="move-col-header">Lv.</span>
-                    <span style="flex: 1.5;">Move</span>
+                    <span style="flex: 2;">Move</span>
                     <span style="flex: 1; text-align: center;">Pwr</span>
                     <span style="flex: 1; text-align: center;">Acc</span>
                     <span style="flex: 1; text-align: right;">PP</span>
