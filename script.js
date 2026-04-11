@@ -837,14 +837,15 @@ window.importCSVOverrides = function(event) {
         let text = e.target.result;
         pendingCSVData = [];
 
-        // NEW: Offline MHT/MHTML Parser!
+        // Offline MHT/MHTML Parser
         if (file.name.toLowerCase().endsWith('.mht') || file.name.toLowerCase().endsWith('.mhtml')) {
             let htmlPart = text;
-            const docMatch = text.match(/<html[\s\S]*?<\/html>/i);
-            if (docMatch) htmlPart = docMatch[0];
             
-            // Clean up MHT formatting artifacts
-            htmlPart = htmlPart.replace(/=\r\n/g, '').replace(/=\n/g, '');
+            // Advanced MHT Quoted-Printable Decoding
+            htmlPart = htmlPart.replace(/=(?:\r\n?|\n)/g, '');
+            htmlPart = htmlPart.replace(/=([A-Fa-f0-9]{2})/g, (m, hex) => {
+                try { return decodeURIComponent('%' + hex); } catch(err) { return String.fromCharCode(parseInt(hex, 16)); }
+            });
             
             const parser = new DOMParser();
             const doc = parser.parseFromString(htmlPart, 'text/html');
@@ -862,13 +863,12 @@ window.importCSVOverrides = function(event) {
                     
                     cols.forEach(col => {
                         let cellText = (col.innerText || col.textContent || "").trim();
-                        cellText = cellText.replace(/=3D/g, '='); // Decode MHT equals signs
                         if (cellText.length > 0) textCount++;
                         rowData.push(cellText);
                     });
                     
                     // Only keep rows with actual data to ignore the menus
-                    if (textCount >= 2) {
+                    if (textCount >= 1) {
                         pendingCSVData.push(rowData);
                     }
                 });
@@ -884,6 +884,18 @@ window.importCSVOverrides = function(event) {
 
         if (pendingCSVData.length < 2) { alert("File appears to be empty or missing data rows."); return; }
 
+        // HEADER HUNTER: Find the first row that actually has multiple words in it (skipping Google's blank spacer rows)
+        let headerIndex = 0;
+        for (let i = 0; i < Math.min(10, pendingCSVData.length); i++) {
+            let nonEmptyCells = pendingCSVData[i].filter(cell => cell.trim() !== '').length;
+            if (nonEmptyCells >= 3) { 
+                headerIndex = i;
+                break;
+            }
+        }
+
+        // Slice off the garbage spacer rows at the top
+        pendingCSVData = pendingCSVData.slice(headerIndex);
         const headers = pendingCSVData[0];
         
         const nameSelect = document.getElementById('csv-col-name');
@@ -893,7 +905,7 @@ window.importCSVOverrides = function(event) {
         
         let optionsHtml = '<option value="-1">-- Skip / Not in Sheet --</option>';
         headers.forEach((header, index) => {
-            const safeHeader = header ? header.replace(/"/g, '').trim() : `Column ${index + 1}`;
+            const safeHeader = header ? header.replace(/"/g, '').trim() : ``;
             optionsHtml += `<option value="${index}">Col ${index + 1}: ${safeHeader}</option>`;
         });
         
@@ -934,6 +946,7 @@ window.executeCSVImport = async function() {
     let importCount = 0;
     if (!offlineOverrides) offlineOverrides = {};
     
+    // Start at i = 1 to skip the header row we found
     for (let i = 1; i < pendingCSVData.length; i++) {
         const row = pendingCSVData[i];
         if (!row || row.length <= nameIdx || !row[nameIdx]) continue;
@@ -1002,7 +1015,6 @@ window.executeCSVImport = async function() {
         if (typeof renderLearnsetCurrentMoves === 'function') renderLearnsetCurrentMoves();
     }
 }
-
 
 // --- INIT ---
 async function initializeApp() {
