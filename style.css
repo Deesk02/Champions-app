@@ -1,5 +1,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: sans-serif; background-color: #1a1a1a; color: #fff; overflow-x: hidden; }
+#view-calculator { display: none; }
+#view-calculator.active { display: block; }
 
 /* --- HEADER & MENU --- */
 #main-header { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 16px; background-color: #212121; box-shadow: 0 2px 4px rgba(0,0,0,0.3); position: sticky; top: 0; z-index: 900; }

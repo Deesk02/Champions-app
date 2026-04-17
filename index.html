@@ -44,6 +44,7 @@
         <button class="drawer-btn" id="tab-moves-btn"><span>⚔</span> Moves</button>
         <button class="drawer-btn" id="tab-items-btn"><span>🎒</span> Items</button>
         <button class="drawer-btn" id="tab-teambuilder-btn"><span>⊕</span> Team Builder</button>
+        <button class="drawer-btn" id="tab-calculator-btn"><span>🧮</span> Calculator</button>
         
         <div class="update-btn-group">
             <p><strong>Database Controls (Internet req.)</strong></p>
@@ -104,6 +105,57 @@
                 <div class="team-slot" id="slot-6"><span class="slot-icon">⊕</span><span>Add Member</span></div>
             </div>
         </div>
+
+        <div id="view-calculator">
+            <h2 style="margin-top: 0;">Damage Calculator</h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 15px;">
+                    <h3 style="margin-top: 0; color: #f44336; border-bottom: 1px solid #555; padding-bottom: 5px;">Attacker</h3>
+                    <button onclick="openCalcSelectModal('attacker')" id="calc-attacker-btn" style="width: 100%; padding: 10px; background: #333; color: #fff; border: 1px solid #555; border-radius: 5px; cursor: pointer; margin-bottom: 10px; font-weight: bold; font-size: 16px;">Select Attacker</button>
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 11px; color: #aaa; text-transform: uppercase;">Nature</label>
+                            <select id="calc-attacker-nature" class="modal-input" style="padding: 8px;" onchange="updateCalc()"></select>
+                        </div>
+                        <div style="flex: 2;">
+                            <label style="font-size: 11px; color: #aaa; text-transform: uppercase;">Move</label>
+                            <select id="calc-move-select" class="modal-input" style="padding: 8px;" onchange="updateCalc()"><option>Select Attacker First</option></select>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span style="font-size: 11px; color: #aaa; font-weight: bold;">STAT POINTS (Max 32 per stat)</span>
+                        <span id="calc-attacker-sp-left" style="font-size: 12px; font-weight: bold; color: #4CAF50;">66 / 66 Left</span>
+                    </div>
+                    <div id="calc-attacker-stats"></div>
+                </div>
+
+                <div style="background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 15px;">
+                    <h3 style="margin-top: 0; color: #2196F3; border-bottom: 1px solid #555; padding-bottom: 5px;">Defender</h3>
+                    <button onclick="openCalcSelectModal('defender')" id="calc-defender-btn" style="width: 100%; padding: 10px; background: #333; color: #fff; border: 1px solid #555; border-radius: 5px; cursor: pointer; margin-bottom: 10px; font-weight: bold; font-size: 16px;">Select Defender</button>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 11px; color: #aaa; text-transform: uppercase;">Nature</label>
+                        <select id="calc-defender-nature" class="modal-input" style="padding: 8px;" onchange="updateCalc()"></select>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span style="font-size: 11px; color: #aaa; font-weight: bold;">STAT POINTS (Max 32 per stat)</span>
+                        <span id="calc-defender-sp-left" style="font-size: 12px; font-weight: bold; color: #4CAF50;">66 / 66 Left</span>
+                    </div>
+                    <div id="calc-defender-stats"></div>
+                </div>
+                
+                <div style="background: #222; border: 2px solid #4CAF50; border-radius: 8px; padding: 15px; text-align: center; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; color: #4CAF50;">Damage Roll</h3>
+                    <div id="calc-result-damage" style="font-size: 32px; font-weight: bold; margin-bottom: 5px; color: #fff;">0% - 0%</div>
+                    <div id="calc-result-hp" style="color: #aaa; font-size: 16px; font-weight: bold;">(0 - 0 HP)</div>
+                    <div id="calc-result-desc" style="margin-top: 10px; font-size: 13px; color: #888;">Select Pokémon and a move to calculate.</div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <div id="fab-container"><button class="fab-main" id="fab-toggle">＋</button><div class="fab-menu" id="fab-menu"><div class="fab-item-container"><span class="fab-label">Sort by...</span><button class="fab-sub" id="fab-btn-sort">⇕</button></div><div class="fab-item-container"><span class="fab-label">Filter by Ability</span><button class="fab-sub" id="fab-btn-ability">✦</button></div><div class="fab-item-container"><span class="fab-label">Filter by Move</span><button class="fab-sub" id="fab-btn-move">⚔</button></div><div class="fab-item-container"><span class="fab-label">Master Dictionary</span><button class="fab-sub" id="fab-btn-search">🔍</button></div></div></div>
@@ -159,9 +211,7 @@
                 <button onclick="closeMasterListModal()" style="background: #4CAF50; color: #fff; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer;">Done</button>
             </div>
             <input type="text" id="master-list-search" placeholder="Search by name or ID..." class="modal-input" autocomplete="off" style="margin-bottom: 10px; flex-shrink: 0;">
-            
-            <div id="master-list-grid" style="flex-grow: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; align-content: flex-start; padding-bottom: 20px; min-height: 0; overscroll-behavior: contain;">
-                </div>
+            <div id="master-list-grid" style="flex-grow: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; align-content: flex-start; padding-bottom: 20px; min-height: 0; overscroll-behavior: contain;"></div>
         </div>
     </div>
 
@@ -240,6 +290,7 @@
             <button onclick="closeTeamEditModal()" style="margin-top: auto; width: 100%; padding: 15px; background: #2196F3; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 20px;">Save Changes</button>
         </div>
     </div>
+
     <div id="team-manager-overlay" class="modal-overlay" style="z-index: 7000;">
         <div id="team-manager-modal" class="bottom-modal" style="height: 80vh; display: flex; flex-direction: column;">
             <h3 style="margin-top: 0; color: #4CAF50; text-align: center;">Saved Teams</h3>
@@ -247,6 +298,7 @@
             <button onclick="closeTeamManagerModal()" class="modal-cancel-btn">Close</button>
         </div>
     </div>
+
     <div id="item-select-modal-overlay" class="modal-overlay" style="z-index: 6000;">
         <div id="item-select-modal" class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;">
             <h3 style="margin-top: 0; color: #00bcd4; text-align: center;">Select Held Item</h3>
@@ -255,12 +307,22 @@
             <button onclick="closeItemSelectModal()" class="modal-cancel-btn">Cancel</button>
         </div>
     </div>
+
     <div id="move-select-modal-overlay" class="modal-overlay" style="z-index: 6000;">
         <div id="move-select-modal" class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;">
             <h3 style="margin-top: 0; color: #9c27b0; text-align: center;">Select Move</h3>
             <input type="text" id="move-select-search" placeholder="Search moves..." autocomplete="off" class="modal-input" style="margin-bottom: 10px;">
             <div id="move-select-list" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;"></div>
             <button onclick="closeMoveSelectModal()" class="modal-cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <div id="calc-select-modal-overlay" class="modal-overlay" style="z-index: 8000;">
+        <div id="calc-select-modal" class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0; color: #2196F3; text-align: center;" id="calc-select-title">Select Pokémon</h3>
+            <input type="text" id="calc-select-search" placeholder="Search by name or ID..." class="modal-input" autocomplete="off" style="margin-bottom: 10px; flex-shrink: 0;">
+            <div id="calc-select-grid" style="flex-grow: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; align-content: flex-start; padding-bottom: 20px; min-height: 0; overscroll-behavior: contain;"></div>
+            <button onclick="closeCalcSelectModal()" class="modal-cancel-btn">Cancel</button>
         </div>
     </div>
 
@@ -318,7 +380,7 @@
         <div id="detail-nav">
             <button class="detail-nav-btn active" id="detail-nav-info"><span class="detail-nav-icon">ⓘ</span> Info</button>
             <button class="detail-nav-btn" id="detail-nav-moves"><span class="detail-nav-icon">⚔</span> Moves</button>
-            <button class="detail-nav-btn" onclick="alert('Damage Calculator coming later!')"><span class="detail-nav-icon">📊</span> Damage</button>
+            <button class="detail-nav-btn" onclick="sendToCalculator()"><span class="detail-nav-icon">📊</span> Damage</button>
         </div>
     </div>
 

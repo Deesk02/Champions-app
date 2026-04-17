@@ -20,14 +20,21 @@ const tagInput = document.getElementById('tag-input');
 const activeTagsContainer = document.getElementById('active-tags');
 
 const tabBtns = document.querySelectorAll('.drawer-btn');
-const views = [ document.getElementById('view-pokemon'), document.getElementById('view-abilities'), document.getElementById('view-moves'), document.getElementById('view-items'), document.getElementById('view-teambuilder') ];
+const views = [ 
+    document.getElementById('view-pokemon'), 
+    document.getElementById('view-abilities'), 
+    document.getElementById('view-moves'), 
+    document.getElementById('view-items'), 
+    document.getElementById('view-teambuilder'),
+    document.getElementById('view-calculator')
+];
 const abilitySearch = document.getElementById('ability-search'); const abilityResultsDiv = document.getElementById('ability-results');
 const movesSearch = document.getElementById('moves-search'); const movesResultsDiv = document.getElementById('moves-results');
 const itemsSearch = document.getElementById('items-search'); const itemsResultsDiv = document.getElementById('items-results');
 
 // --- DATABASES & STATE ---
 let offlineDatabase = []; let offlineAbilities = []; let offlineMoves = []; let offlineItems = []; let offlineEvolutions = []; 
-let offlineOverrides = {}; // New: Custom Learnset Overrides mapping { pokemonId: { added: ['move1'], removed: ['move2'] } }
+let offlineOverrides = {}; 
 
 let activeTags = []; let masterSearchList = [];
 let currentDisplayedPokemon = []; let currentRenderCount = 0; const CHUNK_SIZE = 50;            
@@ -36,7 +43,6 @@ let currentTeam = [null, null, null, null, null, null];
 let activeSlotIndex = null; 
 let savedTeams = JSON.parse(localStorage.getItem('championsSavedTeams')) || [];
 
-// New: Regulations System
 let regulations = JSON.parse(localStorage.getItem('championsRegulations')) || [];
 let activeRegulationId = localStorage.getItem('championsActiveReg') || '';
 
@@ -64,13 +70,14 @@ function switchView(tabId) {
     if(tabId === 'tab-moves-btn') { document.getElementById('view-moves').classList.add('active'); displayMoves(offlineMoves); }
     if(tabId === 'tab-items-btn') { document.getElementById('view-items').classList.add('active'); displayItems(offlineItems); }
     if(tabId === 'tab-teambuilder-btn') { document.getElementById('view-teambuilder').classList.add('active'); renderTeamGrid(); }
+    if(tabId === 'tab-calculator-btn') { document.getElementById('view-calculator').classList.add('active'); renderCalcUI(); }
     closeDrawer();
 }
 tabBtns.forEach(btn => btn.addEventListener('click', (e) => switchView(e.currentTarget.id)));
 
 // --- B. THE INDEXEDDB ENGINE ---
 const DB_NAME = 'ChampionsDB'; 
-const DB_VERSION = 5; // Upgraded for 'overrides'
+const DB_VERSION = 5; 
 
 function initDB() {
     return new Promise((resolve, reject) => {
@@ -82,8 +89,8 @@ function initDB() {
             if(!db.objectStoreNames.contains('moves')) db.createObjectStore('moves'); 
             if(!db.objectStoreNames.contains('items')) db.createObjectStore('items'); 
             if(!db.objectStoreNames.contains('evolutions')) db.createObjectStore('evolutions'); 
-            if(!db.objectStoreNames.contains('overrides')) db.createObjectStore('overrides'); // New Store
-            if(db.objectStoreNames.contains('dexes')) db.deleteObjectStore('dexes'); // Strip legacy dex data
+            if(!db.objectStoreNames.contains('overrides')) db.createObjectStore('overrides');
+            if(db.objectStoreNames.contains('dexes')) db.deleteObjectStore('dexes'); 
         };
         request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
     });
@@ -99,54 +106,185 @@ async function loadOfflineItems() { const saved = await loadFromDB('items'); if 
 async function loadOfflineEvolutions() { const saved = await loadFromDB('evolutions'); if (saved) { offlineEvolutions = saved; } } 
 async function loadOfflineOverrides() { const saved = await loadFromDB('overrides'); if (saved) { offlineOverrides = saved; } else { offlineOverrides = {}; } } 
 
-// --- D. FETCHERS (Modified to grab base generic data) ---
+// --- D. FETCHERS ---
 const BATCH_SIZE = 25; 
+const delay = ms => new Promise(res => setTimeout(res, ms)); // Delay prevents API rate-limiting
+
 async function fetchFromPokeAPI() {
-    let myDatabase = []; const countCheck = await fetch('https://pokeapi.co/api/v2/pokemon'); const countData = await countCheck.json();
-    const response = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${countData.count}`); const data = await response.json();
-    for (let i = 0; i < data.results.length; i += BATCH_SIZE) {
-        statusText.innerText = `PKMN: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`;
-        const batch = data.results.slice(i, i + BATCH_SIZE);
-        const batchResults = await Promise.all(batch.map(async (item) => {
-            try {
-                const pokeResponse = await fetch(item.url); const p = await pokeResponse.json();
-                let baseId = p.id; if (p.species && p.species.url) { const urlParts = p.species.url.split('/'); baseId = parseInt(urlParts[urlParts.length - 2]); }
-                let formType = 'base'; if (p.name.includes('-mega')) formType = 'mega'; else if (p.name.includes('-gmax')) formType = 'gmax'; else if (p.name.includes('-alola') || p.name.includes('-galar') || p.name.includes('-hisui') || p.name.includes('-paldea')) formType = 'regional'; else if (p.id > 10000) formType = 'alt'; 
-                // Notice: We extract ALL moves regardless of version to build the base generic learnset
-                return { id: p.id, baseId: baseId, formType: formType, name: p.name, speciesName: p.species ? p.species.name : p.name, types: p.types.map(t => t.type.name), hp: p.stats[0].base_stat, attack: p.stats[1].base_stat, defense: p.stats[2].base_stat, spAtk: p.stats[3].base_stat, spDef: p.stats[4].base_stat, speed: p.stats[5].base_stat, abilities: p.abilities.map(a => ({ name: a.ability.name, isHidden: a.is_hidden })), moves: p.moves.map(m => m.move.name) };
-            } catch(e) { return null; }
-        }));
-        myDatabase.push(...batchResults.filter(Boolean));
-    }
-    await saveToDB('pokemon', myDatabase); await loadOfflineData();
+    let myDatabase = []; 
+    try {
+        const countCheck = await fetch('https://pokeapi.co/api/v2/pokemon'); 
+        const countData = await countCheck.json();
+        const response = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${countData.count}`); 
+        const data = await response.json();
+        
+        for (let i = 0; i < data.results.length; i += BATCH_SIZE) {
+            statusText.innerText = `PKMN: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; 
+            progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`;
+            const batch = data.results.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(batch.map(async (item) => {
+                try {
+                    const pokeResponse = await fetch(item.url); const p = await pokeResponse.json();
+                    let baseId = p.id; if (p.species && p.species.url) { const urlParts = p.species.url.split('/'); baseId = parseInt(urlParts[urlParts.length - 2]); }
+                    let formType = 'base'; if (p.name.includes('-mega')) formType = 'mega'; else if (p.name.includes('-gmax')) formType = 'gmax'; else if (p.name.includes('-alola') || p.name.includes('-galar') || p.name.includes('-hisui') || p.name.includes('-paldea')) formType = 'regional'; else if (p.id > 10000) formType = 'alt'; 
+                    return { id: p.id, baseId: baseId, formType: formType, name: p.name, speciesName: p.species ? p.species.name : p.name, types: p.types.map(t => t.type.name), hp: p.stats[0].base_stat, attack: p.stats[1].base_stat, defense: p.stats[2].base_stat, spAtk: p.stats[3].base_stat, spDef: p.stats[4].base_stat, speed: p.stats[5].base_stat, abilities: p.abilities.map(a => ({ name: a.ability.name, isHidden: a.is_hidden })), moves: p.moves.map(m => m.move.name) };
+                } catch(e) { console.warn('Failed to fetch PKMN:', item.name, e); return null; }
+            }));
+            myDatabase.push(...batchResults.filter(Boolean));
+            await delay(50); // Give PokeAPI a breather
+        }
+        await saveToDB('pokemon', myDatabase); await loadOfflineData();
+    } catch (err) { console.error("PKMN Fetch Error:", err); throw err; }
 }
 
-async function fetchEvolutionsFromPokeAPI() { /* Keeps your existing evolution fetcher */
-    let myEvolutions = []; const res = await fetch('https://pokeapi.co/api/v2/evolution-chain?limit=1000'); const data = await res.json();
-    function getEvoDetails(details) {
-        if(!details || details.length === 0) return 'Base';
-        let methods = details.map(d => {
-            if (d.trigger.name === 'level-up') { if (d.min_level) return `Lv. ${d.min_level}`; if (d.min_happiness) return `Friendship`; if (d.known_move) return `Knows ${d.known_move.name.replace(/-/g, ' ')}`; if (d.item) return `Holding ${d.item.name.replace(/-/g, ' ')}`; return `Level Up`; } 
-            return d.trigger.name.replace(/-/g, ' ');
-        });
-        return [...new Set(methods)].join(' OR ');
-    }
-    for (let i = 0; i < data.results.length; i += BATCH_SIZE) {
-        statusText.innerText = `Evolutions: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`;
-        const batch = data.results.slice(i, i + BATCH_SIZE);
-        const batchResults = await Promise.all(batch.map(async (item) => {
-            try { const evRes = await fetch(item.url); const evData = await evRes.json(); let chainNames = []; function traverse(node, evoStr) { chainNames.push({ name: node.species.name, detail: evoStr }); node.evolves_to.forEach(child => traverse(child, getEvoDetails(child.evolution_details))); } traverse(evData.chain, 'Base Form'); return chainNames; } catch(e) { return null; }
-        }));
-        myEvolutions.push(...batchResults.filter(Boolean));
-    }
-    await saveToDB('evolutions', myEvolutions); await loadOfflineEvolutions();
+async function fetchEvolutionsFromPokeAPI() { 
+    let myEvolutions = []; 
+    try {
+        const res = await fetch('https://pokeapi.co/api/v2/evolution-chain?limit=1000'); 
+        const data = await res.json();
+        function getEvoDetails(details) {
+            if(!details || details.length === 0) return 'Base';
+            let methods = details.map(d => {
+                if (d.trigger?.name === 'level-up') { if (d.min_level) return `Lv. ${d.min_level}`; if (d.min_happiness) return `Friendship`; if (d.known_move) return `Knows ${d.known_move.name.replace(/-/g, ' ')}`; if (d.item) return `Holding ${d.item.name.replace(/-/g, ' ')}`; return `Level Up`; } 
+                return d.trigger?.name?.replace(/-/g, ' ') || 'Unknown';
+            });
+            return [...new Set(methods)].join(' OR ');
+        }
+        for (let i = 0; i < data.results.length; i += BATCH_SIZE) {
+            statusText.innerText = `Evolutions: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; 
+            progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`;
+            const batch = data.results.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(batch.map(async (item) => {
+                try { 
+                    const evRes = await fetch(item.url); const evData = await evRes.json(); 
+                    let chainNames = []; 
+                    function traverse(node, evoStr) { 
+                        if(node?.species?.name) chainNames.push({ name: node.species.name, detail: evoStr }); 
+                        if(node?.evolves_to) node.evolves_to.forEach(child => traverse(child, getEvoDetails(child.evolution_details))); 
+                    } 
+                    traverse(evData.chain, 'Base Form'); 
+                    return chainNames; 
+                } catch(e) { return null; }
+            }));
+            myEvolutions.push(...batchResults.filter(Boolean));
+            await delay(50);
+        }
+        await saveToDB('evolutions', myEvolutions); await loadOfflineEvolutions();
+    } catch (err) { console.error("Evo Fetch Error:", err); throw err; }
 }
 
-async function fetchAbilitiesFromPokeAPI() { let myAbilities = []; const countCheck = await fetch('https://pokeapi.co/api/v2/ability'); const countData = await countCheck.json(); const response = await fetch(`https://pokeapi.co/api/v2/ability?limit=${countData.count}`); const data = await response.json(); for (let i = 0; i < data.results.length; i += BATCH_SIZE) { statusText.innerText = `Abilities: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`; const batch = data.results.slice(i, i + BATCH_SIZE); const batchResults = await Promise.all(batch.map(async (item) => { try { const abRes = await fetch(item.url); const abData = await abRes.json(); let engDesc = "No description."; const effectEntry = abData.effect_entries.find(e => e.language.name === 'en'); if (effectEntry) engDesc = effectEntry.short_effect || effectEntry.effect; else { const flavor = abData.flavor_text_entries.find(e => e.language.name === 'en'); if (flavor) engDesc = flavor.flavor_text.replace(/\n|\f/g, ' '); } return { id: abData.id, name: abData.name.replace(/-/g, ' '), description: engDesc }; } catch(e) { return null; } })); myAbilities.push(...batchResults.filter(Boolean)); } await saveToDB('abilities', myAbilities); await loadOfflineAbilities(); }
-async function fetchMovesFromPokeAPI() { let myMoves = []; const countCheck = await fetch('https://pokeapi.co/api/v2/move'); const countData = await countCheck.json(); const response = await fetch(`https://pokeapi.co/api/v2/move?limit=${countData.count}`); const data = await response.json(); for (let i = 0; i < data.results.length; i += BATCH_SIZE) { statusText.innerText = `Moves: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`; const batch = data.results.slice(i, i + BATCH_SIZE); const batchResults = await Promise.all(batch.map(async (item) => { try { const mvRes = await fetch(item.url); const mvData = await mvRes.json(); let engDesc = "No description."; const effectEntry = mvData.effect_entries.find(e => e.language.name === 'en'); if (effectEntry) { engDesc = effectEntry.short_effect || effectEntry.effect; if (engDesc) engDesc = engDesc.replace(/\$effect_chance/g, mvData.effect_chance || ''); } else { const flavor = mvData.flavor_text_entries.find(e => e.language.name === 'en'); if (flavor) engDesc = flavor.flavor_text.replace(/\n|\f/g, ' '); } return { id: mvData.id, name: mvData.name.replace(/-/g, ' '), type: mvData.type.name, damage_class: mvData.damage_class ? mvData.damage_class.name : 'status', power: mvData.power || '-', accuracy: mvData.accuracy || '-', pp: mvData.pp || '-', description: engDesc }; } catch(e) { return null; } })); myMoves.push(...batchResults.filter(Boolean)); } await saveToDB('moves', myMoves); await loadOfflineMoves(); }
-async function fetchItemsFromPokeAPI() { let myItems = []; const countCheck = await fetch('https://pokeapi.co/api/v2/item'); const countData = await countCheck.json(); const response = await fetch(`https://pokeapi.co/api/v2/item?limit=${countData.count}`); const data = await response.json(); for (let i = 0; i < data.results.length; i += BATCH_SIZE) { statusText.innerText = `Items: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`; const batch = data.results.slice(i, i + BATCH_SIZE); const batchResults = await Promise.all(batch.map(async (item) => { try { const itRes = await fetch(item.url); const itData = await itRes.json(); let engDesc = "No description."; const effectEntry = itData.effect_entries.find(e => e.language.name === 'en'); if (effectEntry) engDesc = effectEntry.short_effect || effectEntry.effect; else { const flavor = itData.flavor_text_entries.find(e => e.language.name === 'en'); if (flavor) engDesc = flavor.text.replace(/\n|\f/g, ' '); } return { id: itData.id, name: itData.name.replace(/-/g, ' '), cost: itData.cost || 0, description: engDesc }; } catch(e) { return null; } })); myItems.push(...batchResults.filter(Boolean)); } await saveToDB('items', myItems); await loadOfflineItems(); }
+async function fetchAbilitiesFromPokeAPI() { 
+    let myAbilities = []; 
+    try {
+        const countCheck = await fetch('https://pokeapi.co/api/v2/ability'); const countData = await countCheck.json(); 
+        const response = await fetch(`https://pokeapi.co/api/v2/ability?limit=${countData.count}`); const data = await response.json(); 
+        for (let i = 0; i < data.results.length; i += BATCH_SIZE) { 
+            statusText.innerText = `Abilities: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; 
+            progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`; 
+            const batch = data.results.slice(i, i + BATCH_SIZE); 
+            const batchResults = await Promise.all(batch.map(async (item) => { 
+                try { 
+                    const abRes = await fetch(item.url); const abData = await abRes.json(); 
+                    let engDesc = "No description."; 
+                    const effectEntry = (abData.effect_entries || []).find(e => e.language.name === 'en'); 
+                    if (effectEntry) engDesc = effectEntry.short_effect || effectEntry.effect; 
+                    else { 
+                        const flavor = (abData.flavor_text_entries || []).find(e => e.language.name === 'en'); 
+                        if (flavor) engDesc = (flavor.flavor_text || flavor.text || "").replace(/\n|\f/g, ' '); 
+                    } 
+                    return { id: abData.id, name: abData.name.replace(/-/g, ' '), description: engDesc }; 
+                } catch(e) { return null; } 
+            })); 
+            myAbilities.push(...batchResults.filter(Boolean)); 
+            await delay(50);
+        } 
+        await saveToDB('abilities', myAbilities); await loadOfflineAbilities(); 
+    } catch (err) { console.error("Ability Fetch Error:", err); throw err; }
+}
 
-async function syncAllData() { if(!syncAllBtn) return; syncAllBtn.disabled = true; if(progressContainer) progressContainer.style.display = 'block'; try { await fetchFromPokeAPI(); await fetchAbilitiesFromPokeAPI(); await fetchMovesFromPokeAPI(); await fetchItemsFromPokeAPI(); await fetchEvolutionsFromPokeAPI(); statusText.innerText = "All data fully synced!"; } catch (error) { statusText.innerText = "Sync failed. Check internet."; } syncAllBtn.disabled = false; setTimeout(() => { if(progressContainer) progressContainer.style.display = 'none'; if(progressBar) progressBar.style.width = '0%'; }, 2000); }
+async function fetchMovesFromPokeAPI() { 
+    let myMoves = []; 
+    try {
+        const countCheck = await fetch('https://pokeapi.co/api/v2/move'); const countData = await countCheck.json(); 
+        const response = await fetch(`https://pokeapi.co/api/v2/move?limit=${countData.count}`); const data = await response.json(); 
+        for (let i = 0; i < data.results.length; i += BATCH_SIZE) { 
+            statusText.innerText = `Moves: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; 
+            progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`; 
+            const batch = data.results.slice(i, i + BATCH_SIZE); 
+            const batchResults = await Promise.all(batch.map(async (item) => { 
+                try { 
+                    const mvRes = await fetch(item.url); const mvData = await mvRes.json(); 
+                    let engDesc = "No description."; 
+                    const effectEntry = (mvData.effect_entries || []).find(e => e.language.name === 'en'); 
+                    if (effectEntry) { 
+                        engDesc = effectEntry.short_effect || effectEntry.effect; 
+                        if (engDesc) engDesc = engDesc.replace(/\$effect_chance/g, mvData.effect_chance || ''); 
+                    } else { 
+                        const flavor = (mvData.flavor_text_entries || []).find(e => e.language.name === 'en'); 
+                        if (flavor) engDesc = (flavor.flavor_text || flavor.text || "").replace(/\n|\f/g, ' '); 
+                    } 
+                    return { id: mvData.id, name: mvData.name.replace(/-/g, ' '), type: mvData.type?.name || 'normal', damage_class: mvData.damage_class ? mvData.damage_class.name : 'status', power: mvData.power || '-', accuracy: mvData.accuracy || '-', pp: mvData.pp || '-', description: engDesc }; 
+                } catch(e) { return null; } 
+            })); 
+            myMoves.push(...batchResults.filter(Boolean)); 
+            await delay(50);
+        } 
+        await saveToDB('moves', myMoves); await loadOfflineMoves(); 
+    } catch (err) { console.error("Move Fetch Error:", err); throw err; }
+}
+
+async function fetchItemsFromPokeAPI() { 
+    let myItems = []; 
+    try {
+        const countCheck = await fetch('https://pokeapi.co/api/v2/item'); const countData = await countCheck.json(); 
+        const response = await fetch(`https://pokeapi.co/api/v2/item?limit=${countData.count}`); const data = await response.json(); 
+        for (let i = 0; i < data.results.length; i += BATCH_SIZE) { 
+            statusText.innerText = `Items: ${Math.min(i + BATCH_SIZE, data.results.length)} / ${data.results.length}`; 
+            progressBar.style.width = `${(Math.min(i + BATCH_SIZE, data.results.length) / data.results.length) * 100}%`; 
+            const batch = data.results.slice(i, i + BATCH_SIZE); 
+            const batchResults = await Promise.all(batch.map(async (item) => { 
+                try { 
+                    const itRes = await fetch(item.url); const itData = await itRes.json(); 
+                    let engDesc = "No description."; 
+                    const effectEntry = (itData.effect_entries || []).find(e => e.language.name === 'en'); 
+                    if (effectEntry) engDesc = effectEntry.short_effect || effectEntry.effect; 
+                    else { 
+                        const flavor = (itData.flavor_text_entries || []).find(e => e.language.name === 'en'); 
+                        if (flavor) engDesc = (flavor.text || flavor.flavor_text || "").replace(/\n|\f/g, ' '); 
+                    } 
+                    return { id: itData.id, name: itData.name.replace(/-/g, ' '), cost: itData.cost || 0, description: engDesc }; 
+                } catch(e) { return null; } 
+            })); 
+            myItems.push(...batchResults.filter(Boolean)); 
+            await delay(50);
+        } 
+        await saveToDB('items', myItems); await loadOfflineItems(); 
+    } catch (err) { console.error("Item Fetch Error:", err); throw err; }
+}
+
+async function syncAllData() { 
+    if(!syncAllBtn) return; 
+    syncAllBtn.disabled = true; 
+    if(progressContainer) progressContainer.style.display = 'block'; 
+    try { 
+        statusText.innerText = "Starting sync...";
+        await fetchFromPokeAPI(); 
+        await fetchAbilitiesFromPokeAPI(); 
+        await fetchMovesFromPokeAPI(); 
+        await fetchItemsFromPokeAPI(); 
+        await fetchEvolutionsFromPokeAPI(); 
+        statusText.innerText = "All data fully synced!"; 
+    } catch (error) { 
+        console.error("Sync Process Failed:", error);
+        statusText.innerText = "Sync failed. Check the console."; 
+    } 
+    syncAllBtn.disabled = false; 
+    setTimeout(() => { 
+        if(progressContainer) progressContainer.style.display = 'none'; 
+        if(progressBar) progressBar.style.width = '0%'; 
+    }, 2000); 
+}
+
 // --- E. SMART SEARCH, TAGS, & TOP FILTERS ---
 function populateTopFilters() {
     const typeListEl = document.getElementById('filter-type-list');
@@ -161,7 +299,6 @@ function populateTopFilters() {
         });
         regListEl.innerHTML = regHtml;
         
-        // Update header button text on load
         if (activeRegulationId) {
             const activeReg = regulations.find(r => r.id === activeRegulationId);
             if (activeReg) document.getElementById('btn-filter-regulation').innerHTML = `${activeReg.name} <span>▼</span>`;
@@ -198,7 +335,6 @@ function liveFilterPokemon(currentInput = '') {
     const showMega = toggleMega.checked; const showGmax = toggleGmax.checked; const showRegional = toggleRegional.checked; const showAlt = toggleAlt.checked;
     baseList = baseList.filter(p => { if (p.formType === 'mega' && !showMega) return false; if (p.formType === 'gmax' && !showGmax) return false; if (p.formType === 'regional' && !showRegional) return false; if (p.formType === 'alt' && !showAlt) return false; return true; });
     
-    // NEW: Phase 2 Regulation Filtering
     if (activeRegulationId) {
         const activeReg = regulations.find(r => r.id === activeRegulationId);
         if (activeReg && activeReg.pokemon && activeReg.pokemon.length > 0) {
@@ -242,7 +378,7 @@ function loadMoreCards() {
 }
 function manageSentinel() { const oldSentinel = document.getElementById('scroll-sentinel'); if (oldSentinel) scrollObserver.unobserve(oldSentinel); if (oldSentinel) oldSentinel.remove(); if (currentRenderCount < currentDisplayedPokemon.length) { resultsDiv.insertAdjacentHTML('beforeend', '<div id="scroll-sentinel" style="height:10px;"></div>'); scrollObserver.observe(document.getElementById('scroll-sentinel')); } }
 
-// --- G. RENDERING TEXT DBS (Items filtered by regulation) ---
+// --- G. RENDERING TEXT DBS ---
 function displayAbilities(arr) { if (arr.length === 0) { abilityResultsDiv.innerHTML = '<p>No abilities found.</p>'; return; } let htmlString = ''; arr.forEach(a => { htmlString += `<div style="border: 1px solid #444; border-radius: 5px; padding: 10px; margin-bottom: 10px; background-color: #2a2a2a;"><h4 style="margin: 0; text-transform: capitalize; color:#fff;">${a.name}</h4><p style="margin: 5px 0 0 0; font-size: 14px; color:#ccc;">${a.description}</p></div>`; }); abilityResultsDiv.innerHTML = htmlString; }
 function displayMoves(arr) { if (arr.length === 0) { movesResultsDiv.innerHTML = '<p>No moves found.</p>'; return; } let htmlString = ''; arr.forEach(m => { htmlString += `<div style="border: 1px solid #444; border-radius: 5px; padding: 10px; margin-bottom: 10px; background-color: #2a2a2a;"><h4 style="margin: 0 0 5px 0; text-transform: capitalize; color:#fff;">${m.name} <span style="font-weight: normal; font-size: 14px; color: #888;">(${m.type} / ${m.damage_class})</span></h4><div style="background-color: #333; padding: 5px; border-radius: 5px; margin: 5px 0; font-size: 14px; color:#ddd;"><strong>Power:</strong> ${m.power} | <strong>Acc:</strong> ${m.accuracy} | <strong>PP:</strong> ${m.pp}</div><p style="margin: 5px 0 0 0; font-size: 14px; color:#ccc;">${m.description}</p></div>`; }); movesResultsDiv.innerHTML = htmlString; }
 function displayItems(arr) { 
@@ -255,9 +391,9 @@ abilitySearch.addEventListener('input', (e) => { const term = e.target.value.toL
 movesSearch.addEventListener('input', (e) => { const term = e.target.value.toLowerCase(); displayMoves(offlineMoves.filter(m => m.name.toLowerCase().includes(term) || m.type.toLowerCase().includes(term) || m.description.toLowerCase().includes(term) || m.damage_class.toLowerCase().includes(term))); });
 itemsSearch.addEventListener('input', (e) => { const term = e.target.value.toLowerCase(); displayItems(offlineItems.filter(it => it.name.toLowerCase().includes(term) || it.description.toLowerCase().includes(term))); });
 
-// --- H. NEW: REGULATION MANAGER ---
+// --- H. REGULATION MANAGER ---
 let editingReg = { id: '', name: '', pokemon: [], items: [] };
-let regTabActive = 'pokemon'; // 'pokemon' or 'items'
+let regTabActive = 'pokemon';
 
 window.openRegulationManager = function() {
     closeTopFilterModals();
@@ -342,7 +478,6 @@ window.openMasterListModal = function() {
     setTimeout(() => document.getElementById('master-list-modal').classList.add('open'), 10);
     document.getElementById('master-list-search').value = '';
     
-    // Dynamically load Pokemon OR Items based on which tab is active in the Regulation Editor!
     if (regTabActive === 'pokemon') {
         document.getElementById('master-list-title').innerText = "Select Pokémon";
         masterListFiltered = offlineDatabase.sort((a,b) => a.baseId - b.baseId);
@@ -359,7 +494,7 @@ window.openMasterListModal = function() {
 window.closeMasterListModal = function() {
     document.getElementById('master-list-modal').classList.remove('open');
     setTimeout(() => document.getElementById('master-list-modal-overlay').style.display = 'none', 300);
-    renderRegChips(); // Refresh the chips behind the modal to show what we selected
+    renderRegChips(); 
 }
 
 document.getElementById('master-list-search').addEventListener('input', (e) => {
@@ -416,16 +551,8 @@ function manageMasterSentinel() {
 window.toggleMasterSelection = function(name, element) {
     const list = regTabActive === 'pokemon' ? editingReg.pokemon : editingReg.items;
     const index = list.indexOf(name);
-    
-    if (index > -1) {
-        // Deselect
-        list.splice(index, 1);
-        element.classList.remove('selected');
-    } else {
-        // Select
-        list.push(name);
-        element.classList.add('selected');
-    }
+    if (index > -1) { list.splice(index, 1); element.classList.remove('selected'); } 
+    else { list.push(name); element.classList.add('selected'); }
 }
 
 // --- H3. IMPORT / EXPORT REGULATIONS ---
@@ -453,7 +580,6 @@ window.importRegulations = function(event) {
         try {
             const importedData = JSON.parse(e.target.result);
             if (Array.isArray(importedData)) {
-                // Merge logic: If a regulation has the same ID, update it. Otherwise, add it as new.
                 importedData.forEach(importedReg => {
                     const existingIndex = regulations.findIndex(r => r.id === importedReg.id);
                     if (existingIndex >= 0) {
@@ -473,18 +599,15 @@ window.importRegulations = function(event) {
         } catch (err) {
             alert("Error parsing the JSON file. It may be corrupted.");
         }
-        
-        // Reset the file input so you can import the exact same file again if needed
         document.getElementById('import-reg-file').value = '';
     };
     reader.readAsText(file);
 }
 
-
-// --- I. NEW: LEARNSET OVERRIDE SYSTEM ---
+// --- I. LEARNSET OVERRIDE SYSTEM ---
 let editingLearnsetTarget = null;
 window.getEffectiveMoves = function(pokemon) {
-    let moves = [...pokemon.moves]; // Now a flat array of strings due to Phase 2 fetcher
+    let moves = [...pokemon.moves]; 
     if (offlineOverrides && offlineOverrides[pokemon.id]) {
         const added = offlineOverrides[pokemon.id].added || [];
         const removed = offlineOverrides[pokemon.id].removed || [];
@@ -512,7 +635,7 @@ window.closeLearnsetModal = function() {
 window.saveLearnsetOverrides = async function() {
     await saveToDB('overrides', offlineOverrides);
     closeLearnsetModal();
-    renderPokemonMoves(window.currentDetailedPokemon); // Refresh UI
+    renderPokemonMoves(window.currentDetailedPokemon); 
 }
 
 document.getElementById('learnset-search').addEventListener('input', (e) => {
@@ -533,7 +656,6 @@ document.getElementById('learnset-search').addEventListener('input', (e) => {
             div.onclick = () => { 
                 if(!offlineOverrides[editingLearnsetTarget].added) offlineOverrides[editingLearnsetTarget].added = [];
                 offlineOverrides[editingLearnsetTarget].added.push(m.name);
-                // Also remove from "removed" list if they re-add a base move
                 offlineOverrides[editingLearnsetTarget].removed = (offlineOverrides[editingLearnsetTarget].removed || []).filter(x => x !== m.name);
                 document.getElementById('learnset-search').value = ''; 
                 suggBox.style.display = 'none'; 
@@ -560,7 +682,6 @@ function renderLearnsetCurrentMoves() {
 }
 
 window.removeMoveFromLearnset = function(moveName) {
-    // If it's a custom added move, remove from added list. If it's a base move, add to removed list.
     const p = offlineDatabase.find(x => x.id === editingLearnsetTarget);
     const isBaseMove = p.moves.includes(moveName);
     
@@ -572,8 +693,7 @@ window.removeMoveFromLearnset = function(moveName) {
     }
     renderLearnsetCurrentMoves();
 }
-
-// --- J. TEAM BUILDER & EDIT MODALS (Champions Adapted) ---
+// --- J. TEAM BUILDER & EDIT MODALS ---
 window.handlePokemonClick = function(pokemonId) { if (activeSlotIndex !== null) { selectPokemonForTeam(pokemonId); } else { openDetailedView(pokemonId); } };
 window.clearTeam = function() { currentTeam = [null,null,null,null,null,null]; document.getElementById('team-name-input').value = ''; renderTeamGrid(); };
 
@@ -621,7 +741,7 @@ window.closeTeamEditModal = function() { if (editingSlotIndex !== null && curren
 window.removeTeamMember = function() { if (editingSlotIndex !== null) { currentTeam[editingSlotIndex] = null; closeTeamEditModal(); renderTeamGrid(); } }
 if (teamEditOverlay) teamEditOverlay.addEventListener('click', (e) => { if (e.target === teamEditOverlay) closeTeamEditModal(); });
 
-// ITEM SELECTION SUB-MODAL
+// ITEM SELECTION
 const itemSelectOverlay = document.getElementById('item-select-modal-overlay'); const itemSelectModal = document.getElementById('item-select-modal'); const itemSelectList = document.getElementById('item-select-list'); const itemSelectSearch = document.getElementById('item-select-search');
 window.openItemSelectModal = function() { itemSelectOverlay.style.display = 'block'; setTimeout(() => itemSelectModal.classList.add('open'), 10); renderItemSelectList(''); itemSelectSearch.value = ''; itemSelectSearch.focus(); }
 window.closeItemSelectModal = function() { itemSelectModal.classList.remove('open'); setTimeout(() => itemSelectOverlay.style.display = 'none', 300); }
@@ -629,7 +749,6 @@ if (itemSelectOverlay) itemSelectOverlay.addEventListener('click', (e) => { if(e
 itemSelectSearch.addEventListener('input', (e) => { renderItemSelectList(e.target.value.toLowerCase().trim()); });
 function renderItemSelectList(searchTerm) {
     let filtered = offlineItems; 
-    // Filter Items by active regulation in teambuilder too!
     if (activeRegulationId) { const activeReg = regulations.find(r => r.id === activeRegulationId); if (activeReg && activeReg.items && activeReg.items.length > 0) filtered = filtered.filter(it => activeReg.items.includes(it.name)); }
     if (searchTerm) filtered = filtered.filter(it => it.name.toLowerCase().includes(searchTerm));
     let html = `<div onclick="selectItemForTeam('None')" style="padding: 15px; border-bottom: 1px solid #444; cursor: pointer; color: #f44336; font-weight: bold; text-align: center;">Clear Item (None)</div>`;
@@ -637,7 +756,7 @@ function renderItemSelectList(searchTerm) {
 }
 window.selectItemForTeam = function(itemName) { if (editingSlotIndex !== null) { currentTeam[editingSlotIndex].item = itemName.replace(/-/g, ' '); document.getElementById('edit-item').innerText = currentTeam[editingSlotIndex].item; closeItemSelectModal(); } }
 
-// MOVE SELECTION SUB-MODAL
+// MOVE SELECTION
 const moveSelectOverlay = document.getElementById('move-select-modal-overlay'); const moveSelectModal = document.getElementById('move-select-modal'); const moveSelectList = document.getElementById('move-select-list'); const moveSelectSearch = document.getElementById('move-select-search');
 window.openMoveSelectModal = function(moveIndex) { editingMoveIndex = moveIndex; moveSelectOverlay.style.display = 'block'; setTimeout(() => moveSelectModal.classList.add('open'), 10); renderMoveSelectList(''); moveSelectSearch.value = ''; moveSelectSearch.focus(); }
 window.closeMoveSelectModal = function() { moveSelectModal.classList.remove('open'); setTimeout(() => moveSelectOverlay.style.display = 'none', 300); }
@@ -646,7 +765,6 @@ moveSelectSearch.addEventListener('input', (e) => { renderMoveSelectList(e.targe
 function renderMoveSelectList(searchTerm) {
     if (editingSlotIndex === null) return; const member = currentTeam[editingSlotIndex]; 
     const effectiveMoves = getEffectiveMoves(member.data);
-    
     let validMoves = effectiveMoves.map(name => offlineMoves.find(om => om.name.toLowerCase() === name.replace(/-/g, ' '))).filter(Boolean); 
     if (searchTerm) validMoves = validMoves.filter(m => m.name.toLowerCase().includes(searchTerm) || m.type.toLowerCase().includes(searchTerm)); 
     validMoves.sort((a, b) => a.name.localeCompare(b.name));
@@ -679,6 +797,7 @@ function renderTeamManagerList() {
 }
 window.loadSavedTeam = function(idx) { currentTeam = JSON.parse(JSON.stringify(savedTeams[idx].team)); document.getElementById('team-name-input').value = savedTeams[idx].name; renderTeamGrid(); closeTeamManagerModal(); }
 window.deleteSavedTeam = function(idx) { if(confirm("Are you sure you want to delete this team?")) { savedTeams.splice(idx, 1); localStorage.setItem('championsSavedTeams', JSON.stringify(savedTeams)); renderTeamManagerList(); } }
+
 
 // --- K. DETAILED VIEW (Browsing Pokedex) ---
 const viewDetails = document.getElementById('view-details');
@@ -738,17 +857,14 @@ window.openDetailedView = function(pokemonId) {
     setTimeout(() => { document.querySelectorAll('.stat-bar-fill').forEach(bar => { bar.style.width = bar.getAttribute('data-target'); }); }, 50);
 };
 
-// Simplified renderer: Just reads the flat array generated by getEffectiveMoves!
 window.renderPokemonMoves = function(p) {
     const versionSelect = document.getElementById('detail-version-select');
     const version = versionSelect ? versionSelect.value : 'edited';
     
     let moveList = [];
     if (version === 'original') {
-        // Show only the unedited base API moves
         moveList = [...p.moves].sort((a, b) => a.localeCompare(b));
     } else {
-        // Show the edited moveset with overrides applied
         moveList = getEffectiveMoves(p);
     }
     
@@ -759,7 +875,6 @@ window.renderPokemonMoves = function(p) {
         if(moveData) {
             let dmgClassColor = 'dmg-status'; if(moveData.damage_class === 'physical') dmgClassColor = 'dmg-physical'; if(moveData.damage_class === 'special') dmgClassColor = 'dmg-special';
             
-            // Highlight custom added moves with a green "NEW" badge!
             let customTag = '';
             if (version === 'edited' && offlineOverrides[p.id] && offlineOverrides[p.id].added && offlineOverrides[p.id].added.includes(moveName)) {
                 customTag = `<span style="font-size: 9px; background: #4CAF50; color: #fff; padding: 2px 5px; border-radius: 4px; margin-left: 8px; vertical-align: middle;">NEW</span>`;
@@ -856,11 +971,9 @@ window.importCSVOverrides = function(event) {
         let text = e.target.result;
         pendingCSVData = [];
 
-        // Offline MHT/MHTML Parser
         if (file.name.toLowerCase().endsWith('.mht') || file.name.toLowerCase().endsWith('.mhtml')) {
             let htmlPart = text;
             
-            // Advanced MHT Quoted-Printable Decoding
             htmlPart = htmlPart.replace(/=(?:\r\n?|\n)/g, '');
             htmlPart = htmlPart.replace(/=([A-Fa-f0-9]{2})/g, (m, hex) => {
                 try { return decodeURIComponent('%' + hex); } catch(err) { return String.fromCharCode(parseInt(hex, 16)); }
@@ -871,7 +984,6 @@ window.importCSVOverrides = function(event) {
             
             const allTables = Array.from(doc.querySelectorAll('table'));
             if (allTables.length > 0) {
-                // Mathematically isolate the massive data grid
                 const biggestTable = allTables.reduce((a, b) => a.querySelectorAll('tr').length > b.querySelectorAll('tr').length ? a : b);
                 const rows = biggestTable.querySelectorAll('tr');
                 
@@ -886,7 +998,6 @@ window.importCSVOverrides = function(event) {
                         rowData.push(cellText);
                     });
                     
-                    // Only keep rows with actual data to ignore the menus
                     if (textCount >= 1) {
                         pendingCSVData.push(rowData);
                     }
@@ -903,7 +1014,6 @@ window.importCSVOverrides = function(event) {
 
         if (pendingCSVData.length < 2) { alert("File appears to be empty or missing data rows."); return; }
 
-        // HEADER HUNTER: Find the first row that actually has multiple words in it (skipping Google's blank spacer rows)
         let headerIndex = 0;
         for (let i = 0; i < Math.min(10, pendingCSVData.length); i++) {
             let nonEmptyCells = pendingCSVData[i].filter(cell => cell.trim() !== '').length;
@@ -913,7 +1023,6 @@ window.importCSVOverrides = function(event) {
             }
         }
 
-        // Slice off the garbage spacer rows at the top
         pendingCSVData = pendingCSVData.slice(headerIndex);
         const headers = pendingCSVData[0];
         
@@ -933,7 +1042,6 @@ window.importCSVOverrides = function(event) {
         removedSelect.innerHTML = optionsHtml;
         startSelect.innerHTML = optionsHtml;
         
-        // AI Guessing logic
         headers.forEach((h, i) => {
             if (!h) return;
             const lower = h.toLowerCase();
@@ -965,7 +1073,6 @@ window.executeCSVImport = async function() {
     let importCount = 0;
     if (!offlineOverrides) offlineOverrides = {};
     
-    // Start at i = 1 to skip the header row we found
     for (let i = 1; i < pendingCSVData.length; i++) {
         const row = pendingCSVData[i];
         if (!row || row.length <= nameIdx || !row[nameIdx]) continue;
@@ -1009,7 +1116,6 @@ window.executeCSVImport = async function() {
                     }
                 }
 
-                // Calculate exact delta by comparing to base API
                 const baseMoves = targetPkmn.moves.map(m => m.name || m);
                 const newAdded = incomingMoves.filter(m => !baseMoves.includes(m));
                 const newRemoved = baseMoves.filter(m => !incomingMoves.includes(m));
@@ -1032,6 +1138,271 @@ window.executeCSVImport = async function() {
     if (window.currentDetailedPokemon) {
         renderPokemonMoves(window.currentDetailedPokemon);
         if (typeof renderLearnsetCurrentMoves === 'function') renderLearnsetCurrentMoves();
+    }
+}
+
+// --- N. COMPETITIVE DAMAGE CALCULATOR (CHAMPIONS RULES) ---
+
+let calcState = {
+    attacker: null, 
+    defender: null,
+    sp: {
+        attacker: {hp: 0, attack: 0, defense: 0, spAtk: 0, spDef: 0, speed: 0},
+        defender: {hp: 0, attack: 0, defense: 0, spAtk: 0, spDef: 0, speed: 0}
+    },
+    natures: { attacker: 'serious', defender: 'serious' }
+};
+
+const naturesList = {
+    adamant: {plus: 'attack', minus: 'spAtk'}, bold: {plus: 'defense', minus: 'attack'}, brave: {plus: 'attack', minus: 'speed'}, calm: {plus: 'spDef', minus: 'attack'}, careful: {plus: 'spDef', minus: 'spAtk'}, gentle: {plus: 'spDef', minus: 'defense'}, hasty: {plus: 'speed', minus: 'defense'}, impish: {plus: 'defense', minus: 'spAtk'}, jolly: {plus: 'speed', minus: 'spAtk'}, lax: {plus: 'defense', minus: 'spDef'}, lonely: {plus: 'attack', minus: 'defense'}, mild: {plus: 'spAtk', minus: 'defense'}, modest: {plus: 'spAtk', minus: 'attack'}, naive: {plus: 'speed', minus: 'spDef'}, naughty: {plus: 'attack', minus: 'spDef'}, quiet: {plus: 'spAtk', minus: 'speed'}, rash: {plus: 'spAtk', minus: 'spDef'}, relaxed: {plus: 'defense', minus: 'speed'}, sassy: {plus: 'spDef', minus: 'speed'}, serious: {plus: 'none', minus: 'none'}, timid: {plus: 'speed', minus: 'attack'}
+};
+
+const typeChart = {
+    normal: {rock: 0.5, ghost: 0, steel: 0.5}, fire: {fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2}, water: {fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5}, grass: {fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5, steel: 0.5}, electric: {water: 2, grass: 0.5, electric: 0.5, ground: 0, flying: 2, dragon: 0.5}, ice: {fire: 0.5, water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, steel: 0.5}, fighting: {normal: 2, ice: 2, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2, ghost: 0, dark: 2, steel: 2, fairy: 0.5}, poison: {grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0, fairy: 2}, ground: {fire: 2, electric: 2, grass: 0.5, poison: 2, flying: 0, bug: 0.5, rock: 2, steel: 2}, flying: {grass: 2, electric: 0.5, fighting: 2, bug: 2, rock: 0.5, steel: 0.5}, psychic: {fighting: 2, poison: 2, psychic: 0.5, dark: 0, steel: 0.5}, bug: {fire: 0.5, grass: 2, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2, ghost: 0.5, dark: 2, steel: 0.5, fairy: 0.5}, rock: {fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2, steel: 0.5}, ghost: {normal: 0, psychic: 2, ghost: 2, dark: 0.5}, dragon: {dragon: 2, steel: 0.5, fairy: 0}, dark: {fighting: 0.5, psychic: 2, ghost: 2, dark: 0.5, fairy: 0.5}, steel: {fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2}, fairy: {fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5}
+};
+
+window.sendToCalculator = function() {
+    if (window.currentDetailedPokemon) {
+        calcState.attacker = window.currentDetailedPokemon;
+        calcState.sp.attacker = {hp:0, attack:0, defense:0, spAtk:0, spDef:0, speed:0};
+        switchView('tab-calculator-btn');
+        closeDetailedView();
+        renderCalcUI();
+    }
+}
+
+function getCalcStat(role, statName) {
+    const pkmn = calcState[role];
+    if (!pkmn) return 0;
+    const base = pkmn[statName];
+    const sp = calcState.sp[role][statName];
+    
+    if (statName === 'hp') {
+        return base + 75 + sp;
+    } else {
+        let val = base + 20 + sp;
+        const nature = naturesList[calcState.natures[role]];
+        if (nature.plus === statName) val = Math.floor(val * 1.1);
+        if (nature.minus === statName) val = Math.floor(val * 0.9);
+        return val;
+    }
+}
+
+function getTypeEffectiveness(moveType, defenderTypes) {
+    let effectiveness = 1;
+    defenderTypes.forEach(t => {
+        if(typeChart[moveType] && typeChart[moveType][t] !== undefined) {
+            effectiveness *= typeChart[moveType][t];
+        }
+    });
+    return effectiveness;
+}
+
+window.renderCalcUI = function() {
+    ['attacker', 'defender'].forEach(role => {
+        const btn = document.getElementById(`calc-${role}-btn`);
+        const statsContainer = document.getElementById(`calc-${role}-stats`);
+        const natureSelect = document.getElementById(`calc-${role}-nature`);
+        
+        if (natureSelect.options.length === 0) {
+            for (const nat in naturesList) {
+                const opt = document.createElement('option');
+                opt.value = nat; opt.innerText = nat.charAt(0).toUpperCase() + nat.slice(1);
+                if (nat === 'serious') opt.selected = true;
+                natureSelect.appendChild(opt);
+            }
+        }
+
+        if (calcState[role]) {
+            btn.innerHTML = `<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${calcState[role].id}.png" style="width:30px; height:30px; vertical-align:middle; margin-right:10px;"> <span style="text-transform:capitalize;">${calcState[role].name.replace(/-/g, ' ')}</span>`;
+            
+            let statsHtml = '';
+            const statLabels = {hp: 'HP', attack: 'Atk', defense: 'Def', spAtk: 'Sp.A', spDef: 'Sp.D', speed: 'Spe'};
+            
+            for (let statName in statLabels) {
+                const val = getCalcStat(role, statName);
+                statsHtml += `
+                    <div style="display: flex; align-items: center; margin-bottom: 8px; font-size: 14px;">
+                        <span style="width: 40px; color: #aaa; font-weight: bold;">${statLabels[statName]}</span>
+                        <input type="range" id="calc-${role}-sp-${statName}" min="0" max="32" value="${calcState.sp[role][statName]}" oninput="updateCalcSp('${role}', '${statName}', this.value)" style="flex-grow: 1; margin: 0 15px;">
+                        <span id="calc-${role}-val-${statName}" style="width: 35px; text-align: right; font-weight: bold; color: #fff;">${val}</span>
+                    </div>`;
+            }
+            statsContainer.innerHTML = statsHtml;
+            
+        } else {
+            btn.innerText = `Select ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+            statsContainer.innerHTML = `<div style="text-align:center; color:#666; padding: 20px 0;">Select a Pokémon to allocate stats.</div>`;
+        }
+    });
+    
+    const moveSelect = document.getElementById('calc-move-select');
+    if (calcState.attacker) {
+        const moves = getEffectiveMoves(calcState.attacker);
+        let opts = `<option value="None">-- Select Move --</option>`;
+        moves.forEach(m => {
+            const moveData = offlineMoves.find(om => om.name.toLowerCase() === m.replace(/-/g, ' '));
+            if (moveData && moveData.damage_class !== 'status' && moveData.power !== '-') {
+                opts += `<option value="${moveData.name}">${moveData.name} (${moveData.power})</option>`;
+            }
+        });
+        moveSelect.innerHTML = opts;
+    } else {
+        moveSelect.innerHTML = `<option>Select Attacker First</option>`;
+    }
+
+    updateCalc();
+}
+
+window.updateCalcSp = function(role, statName, value) {
+    let val = parseInt(value) || 0;
+    if (val < 0) val = 0; if (val > 32) val = 32;
+    
+    let currentTotal = 0;
+    for (let s in calcState.sp[role]) {
+        if (s !== statName) currentTotal += calcState.sp[role][s];
+    }
+    if (currentTotal + val > 66) val = 66 - currentTotal;
+    
+    calcState.sp[role][statName] = val;
+    document.getElementById(`calc-${role}-sp-${statName}`).value = val;
+    updateCalc();
+}
+
+window.updateCalc = function() {
+    calcState.natures.attacker = document.getElementById('calc-attacker-nature').value || 'serious';
+    calcState.natures.defender = document.getElementById('calc-defender-nature').value || 'serious';
+    
+    ['attacker', 'defender'].forEach(role => {
+        if (!calcState[role]) return;
+        let totalSp = 0;
+        ['hp', 'attack', 'defense', 'spAtk', 'spDef', 'speed'].forEach(stat => {
+            totalSp += calcState.sp[role][stat];
+            const finalStat = getCalcStat(role, stat);
+            const displayEl = document.getElementById(`calc-${role}-val-${stat}`);
+            if (displayEl) displayEl.innerText = finalStat;
+        });
+        const leftEl = document.getElementById(`calc-${role}-sp-left`);
+        if(leftEl) leftEl.innerText = `${66 - totalSp} / 66 Left`;
+    });
+    
+    calculateDamage();
+}
+
+function calculateDamage() {
+    const resultDamage = document.getElementById('calc-result-damage');
+    const resultHp = document.getElementById('calc-result-hp');
+    const resultDesc = document.getElementById('calc-result-desc');
+    
+    if (!calcState.attacker || !calcState.defender) {
+        resultDamage.innerText = "0% - 0%"; resultHp.innerText = "(0 - 0 HP)"; resultDesc.innerText = "Select both Pokémon."; return;
+    }
+    
+    const moveSelect = document.getElementById('calc-move-select');
+    const moveName = moveSelect.value;
+    if (moveName === 'None' || !moveName) {
+        resultDamage.innerText = "0% - 0%"; resultHp.innerText = "(0 - 0 HP)"; resultDesc.innerText = "Select a move to calculate damage."; return;
+    }
+    
+    const moveData = offlineMoves.find(m => m.name === moveName);
+    if (!moveData || moveData.damage_class === 'status' || moveData.power === '-') {
+        resultDamage.innerText = "0% - 0%"; resultHp.innerText = "(0 - 0 HP)"; resultDesc.innerText = "Selected move does no direct damage."; return;
+    }
+    
+    const power = parseInt(moveData.power) || 0;
+    if (power === 0) return;
+    
+    let attackStat = getCalcStat('attacker', moveData.damage_class === 'physical' ? 'attack' : 'spAtk');
+    let defenseStat = getCalcStat('defender', moveData.damage_class === 'physical' ? 'defense' : 'spDef');
+    
+    // Core Formula with Level 50 assumed
+    let damageBase = Math.floor(Math.floor((Math.floor(2 * 50 / 5) + 2) * power * attackStat / defenseStat) / 50) + 2;
+    
+    let stab = calcState.attacker.types.includes(moveData.type) ? 1.5 : 1;
+    let effectiveness = getTypeEffectiveness(moveData.type, calcState.defender.types);
+    
+    let minMod = damageBase * stab * effectiveness * 0.85;
+    let maxMod = damageBase * stab * effectiveness * 1.00;
+    
+    let minDamage = Math.floor(minMod);
+    let maxDamage = Math.floor(maxMod);
+    
+    let defenderHp = getCalcStat('defender', 'hp');
+    
+    let minPct = ((minDamage / defenderHp) * 100).toFixed(1);
+    let maxPct = ((maxDamage / defenderHp) * 100).toFixed(1);
+    
+    resultDamage.innerText = `${minPct}% - ${maxPct}%`;
+    resultHp.innerText = `(${minDamage} - ${maxDamage} HP)`;
+    
+    let descText = `${moveData.name} vs. ${calcState.defender.name.replace(/-/g, ' ')}: `;
+    if (effectiveness > 1) descText += "It's super effective!";
+    else if (effectiveness === 0) descText += "It has no effect.";
+    else if (effectiveness < 1) descText += "It's not very effective...";
+    else descText += "Normal effectiveness.";
+    
+    resultDesc.innerText = descText;
+}
+
+// --- CALC SELECTION MODAL ---
+let activeCalcRole = ''; let calcListFiltered = []; let calcRenderCount = 0;
+const calcObserver = new IntersectionObserver((entries) => { if (entries[0].isIntersecting) loadMoreCalcCards(); }, { rootMargin: "200px" });
+
+window.openCalcSelectModal = function(role) {
+    activeCalcRole = role;
+    document.getElementById('calc-select-modal-overlay').style.display = 'block';
+    setTimeout(() => document.getElementById('calc-select-modal').classList.add('open'), 10);
+    document.getElementById('calc-select-search').value = '';
+    
+    calcListFiltered = offlineDatabase.sort((a,b) => a.baseId - b.baseId);
+    document.getElementById('calc-select-grid').innerHTML = '';
+    calcRenderCount = 0; loadMoreCalcCards();
+}
+
+window.closeCalcSelectModal = function() {
+    document.getElementById('calc-select-modal').classList.remove('open');
+    setTimeout(() => document.getElementById('calc-select-modal-overlay').style.display = 'none', 300);
+}
+
+document.getElementById('calc-select-search').addEventListener('input', (e) => {
+    const val = e.target.value.toLowerCase().trim();
+    calcListFiltered = offlineDatabase.filter(p => p.name.toLowerCase().includes(val) || String(p.baseId) === val).sort((a,b) => a.baseId - b.baseId);
+    document.getElementById('calc-select-grid').innerHTML = '';
+    calcRenderCount = 0; loadMoreCalcCards();
+});
+
+function loadMoreCalcCards() {
+    if (calcRenderCount >= calcListFiltered.length) return;
+    const start = calcRenderCount; const end = Math.min(start + 60, calcListFiltered.length);
+    const chunk = calcListFiltered.slice(start, end);
+    let html = '';
+    chunk.forEach(item => {
+        html += `<div class="master-card" onclick="selectCalcPokemon(${item.id})">
+            <div class="master-card-id">#${String(item.baseId).padStart(3, '0')}</div>
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${item.id}.png" loading="lazy">
+            <div class="master-card-name">${item.name.replace(/-/g, ' ')}</div>
+        </div>`;
+    });
+    document.getElementById('calc-select-grid').insertAdjacentHTML('beforeend', html);
+    calcRenderCount = end; manageCalcSentinel();
+}
+
+function manageCalcSentinel() {
+    const old = document.getElementById('calc-scroll-sentinel');
+    if (old) calcObserver.unobserve(old); if (old) old.remove();
+    if (calcRenderCount < calcListFiltered.length) {
+        document.getElementById('calc-select-grid').insertAdjacentHTML('beforeend', '<div id="calc-scroll-sentinel" style="height:10px; grid-column: 1 / -1;"></div>');
+        calcObserver.observe(document.getElementById('calc-scroll-sentinel'));
+    }
+}
+
+window.selectCalcPokemon = function(id) {
+    const p = offlineDatabase.find(x => x.id === id);
+    if (p) {
+        calcState[activeCalcRole] = p;
+        calcState.sp[activeCalcRole] = {hp:0, attack:0, defense:0, spAtk:0, spDef:0, speed:0};
+        renderCalcUI();
+        closeCalcSelectModal();
     }
 }
 
