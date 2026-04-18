@@ -1,9 +1,9 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: sans-serif; background-color: #1a1a1a; color: #fff; overflow-x: hidden; }
-#view-calculator { display: none; }
-#view-calculator.active { display: block; }
 
-/* --- HEADER & MENU --- */
+/* ==========================================
+   1. HEADER & MENU
+   ========================================== */
 #main-header { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 16px; background-color: #212121; box-shadow: 0 2px 4px rgba(0,0,0,0.3); position: sticky; top: 0; z-index: 900; }
 #menu-toggle { font-size: 24px; color: #fff; background: none; border: none; padding: 0; cursor: pointer; }
 #header-title { font-size: 20px; font-weight: normal; margin: 0 16px; flex-grow: 1; }
@@ -27,42 +27,91 @@ body { margin: 0; font-family: sans-serif; background-color: #1a1a1a; color: #ff
 
 #content-area { padding: 15px; padding-bottom: 100px; }
 
-/* --- TOP FILTER BUTTONS --- */
+/* ==========================================
+   2. TOP FILTER BUTTONS
+   ========================================== */
 .top-filter-btn { flex: 1; padding: 10px 5px; background: #333; color: #ccc; border: 1px solid #444; border-radius: 8px; font-size: 11px; font-weight: bold; text-transform: uppercase; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 5px; }
 .top-filter-btn.active { color: #fff; background: #444; border-color: #888; }
 .filter-modal-btn { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.4); font-size: 14px; font-weight: bold; text-transform: uppercase; cursor: pointer; margin-bottom: 8px; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
 .filter-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 
-/* --- CARDS & COLORS --- */
-.type-chip { display: inline-block; padding: 3px 12px; border-radius: 12px; font-size: 10px; text-transform: uppercase; color: rgba(0,0,0,0.8); font-weight: bold; margin-right: 5px; border: 1px solid #000; }
-.type-normal { background-color: #c4c4b6; } .type-fire { background-color: #f7b5a8; } .type-water { background-color: #a8def7; } .type-grass { background-color: #a8f0cc; } .type-electric { background-color: #fae29c; } .type-ice { background-color: #c4f0f0; } .type-fighting { background-color: #e8a3a3; } .type-poison { background-color: #d1b3f0; } .type-ground { background-color: #ebd69d; } .type-flying { background-color: #b7d6f7; } .type-psychic { background-color: #fcaebc; } .type-bug { background-color: #d2e08b; } .type-rock { background-color: #d9cc8c; } .type-ghost { background-color: #c2b5eb; } .type-dragon { background-color: #bba3fc; } .type-dark { background-color: #ad9c91; } .type-steel { background-color: #d1d1e0; } .type-fairy { background-color: #f5bdf5; }
+/* ==========================================
+   3. CARDS & COLORS
+   ========================================== */
+.type-chip { display: inline-block; padding: 3px 12px; border-radius: 12px; font-size: 10px; text-transform: uppercase; color: #fff; font-weight: bold; margin-right: 5px; border: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
+
+/* Card Left Borders (Primary Type) */
+.poke-card { position: relative; display: flex; border-radius: 12px; height: 85px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; background-color: #2a2a2a; border-left: 5px solid #888; margin-bottom: 15px; }
+.poke-card.type-normal { border-left-color: #c4c4b6 !important; }
+.poke-card.type-fire { border-left-color: #EE8130 !important; }
+.poke-card.type-water { border-left-color: #6390F0 !important; }
+.poke-card.type-electric { border-left-color: #F7D02C !important; }
+.poke-card.type-grass { border-left-color: #7AC74C !important; }
+.poke-card.type-ice { border-left-color: #96D9D6 !important; }
+.poke-card.type-fighting { border-left-color: #C22E28 !important; }
+.poke-card.type-poison { border-left-color: #A33EA1 !important; }
+.poke-card.type-ground { border-left-color: #E2BF65 !important; }
+.poke-card.type-flying { border-left-color: #A98FF3 !important; }
+.poke-card.type-psychic { border-left-color: #F95587 !important; }
+.poke-card.type-bug { border-left-color: #A6B91A !important; }
+.poke-card.type-rock { border-left-color: #B6A136 !important; }
+.poke-card.type-ghost { border-left-color: #735797 !important; }
+.poke-card.type-dragon { border-left-color: #6F35FC !important; }
+.poke-card.type-dark { border-left-color: #705746 !important; }
+.poke-card.type-steel { border-left-color: #B7B7CE !important; }
+.poke-card.type-fairy { border-left-color: #D685AD !important; }
+
+/* Individual Chip Backgrounds */
+.type-chip.type-normal { background-color: #c4c4b6 !important; color: #000; text-shadow: none; }
+.type-chip.type-fire { background-color: #EE8130 !important; }
+.type-chip.type-water { background-color: #6390F0 !important; }
+.type-chip.type-electric { background-color: #F7D02C !important; color: #000; text-shadow: none; }
+.type-chip.type-grass { background-color: #7AC74C !important; color: #000; text-shadow: none; }
+.type-chip.type-ice { background-color: #96D9D6 !important; color: #000; text-shadow: none; }
+.type-chip.type-fighting { background-color: #C22E28 !important; }
+.type-chip.type-poison { background-color: #A33EA1 !important; }
+.type-chip.type-ground { background-color: #E2BF65 !important; color: #000; text-shadow: none; }
+.type-chip.type-flying { background-color: #A98FF3 !important; }
+.type-chip.type-psychic { background-color: #F95587 !important; }
+.type-chip.type-bug { background-color: #A6B91A !important; color: #000; text-shadow: none; }
+.type-chip.type-rock { background-color: #B6A136 !important; color: #000; text-shadow: none; }
+.type-chip.type-ghost { background-color: #735797 !important; }
+.type-chip.type-dragon { background-color: #6F35FC !important; }
+.type-chip.type-dark { background-color: #705746 !important; }
+.type-chip.type-steel { background-color: #B7B7CE !important; color: #000; text-shadow: none; }
+.type-chip.type-fairy { background-color: #D685AD !important; color: #000; text-shadow: none; }
 
 #search-results { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
-.poke-card { position: relative; display: flex; border-radius: 12px; height: 85px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer;}
 .card-info { flex-grow: 1; padding: 10px 15px; display: flex; flex-direction: column; justify-content: space-between; z-index: 2; }
 .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;}
 .card-name-group { display: flex; align-items: baseline; gap: 6px; }
-.card-id { font-size: 13px; color: rgba(0,0,0,0.5); font-weight: bold;}
-.card-name { font-size: 16px; text-transform: capitalize; color: rgba(0,0,0,0.7); font-weight: normal; margin: 0; }
+.card-id { font-size: 13px; color: #aaa; font-weight: bold;}
+.card-name { font-size: 16px; text-transform: capitalize; color: #fff; font-weight: normal; margin: 0; }
 .card-sprite-container { position: relative; width: 100px; height: 85px; background-color: rgba(255,255,255,0.1); border-radius: 50% 0 0 50%; margin-left: -10px; }
 .card-sprite { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 75px; height: 75px; }
 .card-meta-icons { display: flex; gap: 8px; font-size: 14px; color: rgba(0,0,0,0.4); margin-right: 15px; align-items: center;}
 .stat-badge { background-color: rgba(0,0,0,0.6); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
 
-/* --- TAGS & TABS --- */
+/* ==========================================
+   4. TAGS & TABS
+   ========================================== */
 #active-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; padding: 5px; border: 1px dashed #555; border-radius: 5px; background-color: #222;}
 #tag-input { width: 100%; padding: 10px; font-size: 16px; background: #333; border: 1px solid #444; color: #fff; border-radius: 5px; }
 #custom-suggestions { z-index: 3000; } 
-#view-pokemon, #view-abilities, #view-moves, #view-items, #view-teambuilder { display: none; }
-#view-pokemon.active, #view-abilities.active, #view-moves.active, #view-items.active, #view-teambuilder.active { display: block; }
+#view-pokemon, #view-abilities, #view-moves, #view-items, #view-teambuilder, #view-calculator { display: none; }
+#view-pokemon.active, #view-abilities.active, #view-moves.active, #view-items.active, #view-teambuilder.active, #view-calculator.active { display: block; }
 
-/* --- TEAM BUILDER GRID --- */
+/* ==========================================
+   5. TEAM BUILDER GRID
+   ========================================== */
 #team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
-.team-slot { background-color: #2a2a2a; border: 2px dashed #555; border-radius: 12px; height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #777; font-weight: bold; cursor: pointer; transition: all 0.2s ease; position: relative; }
+.team-slot { background-color: #2a2a2a; border: 2px dashed #555; border-radius: 12px; height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #777; font-weight: bold; cursor: pointer; transition: all 0.2s ease; position: relative; text-align: center; }
 .team-slot:active { background-color: #333; border-color: #777; }
 .slot-icon { font-size: 32px; margin-bottom: 5px; color: #555; }
 
-/* --- FLOATING ACTION BUTTON (FAB) --- */
+/* ==========================================
+   6. FLOATING ACTION BUTTON (FAB)
+   ========================================== */
 #fab-container { position: fixed; bottom: 25px; right: 25px; z-index: 4000; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 15px; }
 .fab-main { width: 60px; height: 60px; border-radius: 50%; background-color: #555; color: white; border: none; font-size: 28px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease, background-color 0.2s; }
 .fab-main.active { transform: rotate(45deg); background-color: #f44336; }
@@ -73,8 +122,10 @@ body { margin: 0; font-family: sans-serif; background-color: #1a1a1a; color: #ff
 .fab-sub { width: 48px; height: 48px; border-radius: 50%; background-color: #444; color: white; border: none; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .fab-sub:active { background-color: #666; }
 
-/* --- MODALS --- */
-.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 5000; }
+/* ==========================================
+   7. MODALS
+   ========================================== */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 5000; pointer-events: auto; }
 .bottom-modal { position: absolute; bottom: 0; left: 0; width: 100%; background: #2d2d2d; border-radius: 20px 20px 0 0; padding: 20px; box-shadow: 0 -4px 10px rgba(0,0,0,0.5); transform: translateY(100%); transition: transform 0.3s ease-out; }
 .bottom-modal.open { transform: translateY(0); }
 .sort-btn { background: #333; color: #fff; border: 1px solid #444; padding: 12px; border-radius: 8px; font-size: 16px; text-align: left; cursor: pointer; }
@@ -83,11 +134,13 @@ body { margin: 0; font-family: sans-serif; background-color: #1a1a1a; color: #ff
 .sort-dir-btn { flex: 1; background: #333; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; }
 .sort-dir-btn.active { background: #2196F3; border-color: #2196F3; font-weight: bold; }
 
-/* --- DETAILED VIEW --- */
+/* ==========================================
+   8. DETAILED VIEW
+   ========================================== */
 #view-details { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 6000; background: #1a1a1a; overflow-y: auto; }
 #detail-header { padding: 20px; padding-top: 40px; display: flex; justify-content: space-between; align-items: flex-start; border-radius: 0 0 30px 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: background-color 0.3s ease; }
 #detail-back-btn { background: rgba(0,0,0,0.3); border: none; color: white; padding: 8px 15px; border-radius: 20px; font-size: 16px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
-#detail-name { margin: 0; font-size: 32px; text-transform: capitalize; color: rgba(0,0,0,0.8); }
+#detail-name { margin: 0; font-size: 32px; text-transform: capitalize; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); }
 #detail-id { font-size: 18px; font-weight: bold; color: rgba(0,0,0,0.5); margin-bottom: -15px; display: block; text-align: right; }
 #detail-sprite { width: 140px; height: 140px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.4)); margin-right: -10px; }
 
@@ -109,8 +162,8 @@ body { margin: 0; font-family: sans-serif; background-color: #1a1a1a; color: #ff
 .dmg-special { background: #3f51b5; color: #fff; }
 .dmg-status { background: #9e9e9e; color: #fff; }
 
-#detail-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #222; display: flex; justify-content: space-around; padding: 12px 10px; border-top: 1px solid #333; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); z-index: 6010; }
-.detail-nav-btn { background: none; border: none; color: #888; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+#detail-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #222; display: flex; justify-content: space-around; padding: 12px 10px; border-top: 1px solid #333; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); z-index: 6010; padding-bottom: env(safe-area-inset-bottom); }
+.detail-nav-btn { background: none; border: none; color: #888; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; flex: 1;}
 .detail-nav-btn.active { color: #fff; font-weight: bold; }
 .detail-nav-icon { font-size: 20px; }
 
@@ -121,19 +174,22 @@ body { margin: 0; font-family: sans-serif; background-color: #1a1a1a; color: #ff
 .evo-sprite { width: 70px; height: 70px; object-fit: contain; }
 .evo-name { font-size: 12px; text-transform: capitalize; text-align: center; margin-top: 5px; font-weight: bold; }
 
-/* --- TEAM BUILDER EDIT MENU --- */
+/* ==========================================
+   9. TEAM BUILDER EDIT MENU
+   ========================================== */
 .edit-section-title { font-size: 12px; color: #aaa; text-transform: uppercase; margin: 15px 0 5px 0; border-bottom: 1px solid #444; padding-bottom: 3px; font-weight: bold; }
 .edit-btn { width: 100%; background: #333; color: #fff; border: 1px solid #555; padding: 15px; border-radius: 8px; text-align: left; font-size: 16px; margin-bottom: 8px; text-transform: capitalize; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
 .edit-btn span { color: #888; font-size: 14px; text-transform: none; }
 .edit-move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .edit-move-btn { background: #333; color: #fff; border: 1px solid #555; padding: 15px 10px; border-radius: 8px; text-align: center; font-weight: bold; text-transform: capitalize; font-size: 14px; cursor: pointer; }
 
-/* --- NEW CHAMPIONS APP STYLES --- */
+/* ==========================================
+   10. APP OVERRIDES & REGULATIONS
+   ========================================== */
 .modal-cancel-btn { margin-top: 15px; width: 100%; padding: 15px; background: #444; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
-.modal-input { width: 100%; padding: 15px; font-size: 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 8px; }
+.modal-input { width: 100%; padding: 15px; font-size: 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 8px; outline: none; }
 .autocomplete-dropdown { position: absolute; bottom: 100%; left: 0; width: 100%; max-height: 150px; overflow-y: auto; background: #444; border-radius: 8px 8px 0 0; z-index: 5001; margin-bottom: 5px; box-shadow: 0 -4px 6px rgba(0,0,0,0.3); }
 
-/* Chips for Regulations/Overrides */
 .reg-chip { display: flex; align-items: center; gap: 8px; background: #3f51b5; padding: 6px 12px; border-radius: 20px; font-size: 13px; text-transform: capitalize; }
 .reg-chip-remove { background: none; border: none; color: #fff; font-size: 16px; line-height: 1; padding: 0; cursor: pointer; opacity: 0.7; }
 .reg-chip-remove:active { opacity: 1; color: #f44336; }
@@ -141,10 +197,22 @@ body { margin: 0; font-family: sans-serif; background-color: #1a1a1a; color: #ff
 .override-move-row { background: #333; border: 1px solid #555; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; text-transform: capitalize; }
 .override-move-remove { background: #f44336; border: none; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; cursor: pointer; }
 
-/* --- MASTER LIST UI --- */
 .master-card { background: #333; border: 2px solid #444; border-radius: 8px; padding: 8px 5px; text-align: center; cursor: pointer; transition: all 0.1s ease; display: flex; flex-direction: column; align-items: center; position: relative; }
 .master-card.selected { border-color: #4CAF50; background: #2e4a2e; }
 .master-card.selected::after { content: '✔'; position: absolute; top: 5px; right: 5px; color: #4CAF50; font-weight: bold; font-size: 14px; background: rgba(0,0,0,0.5); width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
 .master-card img { width: 60px; height: 60px; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); }
 .master-card-name { font-size: 12px; font-weight: bold; text-transform: capitalize; color: #fff; margin-top: 5px; line-height: 1.2; }
-.master-card-id { font-size: 10px; color: #aaa; margin-bottom: 2px;}
+.master-card-id { font-size: 10px; color: #aaa; position: absolute; top: 5px; left: 5px;}
+
+/* ==========================================
+   11. CALCULATOR GRID & EDITOR
+   ========================================== */
+.calc-stat-row { display: flex; justify-content: space-between; align-items: center; background: #333; padding: 8px 10px; border-radius: 6px; margin-bottom: 5px; cursor: pointer; border: 1px solid #444; }
+.calc-stat-row:active { background: #444; }
+.calc-stat-label { font-weight: bold; color: #aaa; font-size: 11px; text-transform: uppercase; }
+.calc-stat-sp { color: #4CAF50; font-weight: bold; font-size: 11px; background: #222; padding: 2px 6px; border-radius: 4px; border: 1px solid #444; min-width: 30px; text-align: center; }
+.calc-stat-final { color: #fff; font-weight: bold; font-size: 14px; text-align: right; }
+.calc-adj-btn { background: #444; color: #fff; border: 1px solid #555; border-radius: 8px; padding: 12px 0; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; transition: background 0.1s; }
+.calc-adj-btn:active { background: #666; }
+.calc-move-card { background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background 0.1s; margin-bottom: 8px; }
+.calc-move-card:active { background: #333; border-color: #666; }
