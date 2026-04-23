@@ -1,12 +1,12 @@
 const CACHE_NAME = 'champions-v1';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/script.js',
-  '/manifest.json'
+  './',
+  './index.html',
+  './style.css',
+  './script.js',
+  './manifest.json',
+  './calculator.js' // Added this since it's crucial for offline math!
 ];
-
 // Install Event - Caches the files
 self.addEventListener('install', event => {
   event.waitUntil(
