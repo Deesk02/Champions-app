@@ -3,21 +3,21 @@
 // ==========================================
 
 const complexMoveStatEffects = { 
-    'shell smash': {attack: 2, spAtk: 2, speed: 2, defense: -1, spDef: -1}, 
+    'shell-smash': {attack: 2, spAtk: 2, speed: 2, defense: -1, spDef: -1}, 
     'superpower': {attack: -1, defense: -1}, 
-    'close combat': {defense: -1, spDef: -1},
+    'close-combat': {defense: -1, spDef: -1},
     'v-create': {defense: -1, spDef: -1, speed: -1}, 
-    'make it rain': {spAtk: -1},
+    'make-it-rain': {spAtk: -1},
     'overheat': {spAtk: -2}, 
-    'draco meteor': {spAtk: -2}, 
-    'leaf storm': {spAtk: -2}, 
-    'fleur cannon': {spAtk: -2},
+    'draco-meteor': {spAtk: -2}, 
+    'leaf-storm': {spAtk: -2}, 
+    'fleur-cannon': {spAtk: -2},
     'growth': {attack: 1, spAtk: 1}, 
-    'work up': {attack: 1, spAtk: 1},
-    'dragon dance': {attack: 1, speed: 1},
-    'bulk up': {attack: 1, defense: 1},
-    'calm mind': {spAtk: 1, spDef: 1},
-    'quiver dance': {spAtk: 1, spDef: 1, speed: 1},
+    'work-up': {attack: 1, spAtk: 1},
+    'dragon-dance': {attack: 1, speed: 1},
+    'bulk-up': {attack: 1, defense: 1},
+    'calm-mind': {spAtk: 1, spDef: 1},
+    'quiver-dance': {spAtk: 1, spDef: 1, speed: 1},
     'geomancy': {spAtk: 2, spDef: 2, speed: 2}
 };
 
@@ -104,7 +104,7 @@ window.calculateDamage = function() {
         let useDefenderAttack = false;
         const lowerName = moveName.toLowerCase(); let boostedTag = '';
 
-        if (lowerName === 'stored power' || lowerName === 'power trip') {
+        if (lowerName === 'stored-power' || lowerName === 'power-trip') {
             let totalPositiveStages = 0; for (let s in calcState.stages.attacker) { if (calcState.stages.attacker[s] > 0) totalPositiveStages += calcState.stages.attacker[s]; }
             power = 20 + (20 * totalPositiveStages); if (power > 20) boostedTag = `<span style="color:#FF9800; font-size:10px; margin-left:4px;">(Boosted)</span>`;
         }
@@ -112,15 +112,30 @@ window.calculateDamage = function() {
             let totalPositiveStages = 0; for (let s in calcState.stages.defender) { if (calcState.stages.defender[s] > 0) totalPositiveStages += calcState.stages.defender[s]; }
             power = Math.min(200, 60 + (20 * totalPositiveStages)); if (power > 60) boostedTag = `<span style="color:#FF9800; font-size:10px; margin-left:4px;">(Boosted)</span>`;
         }
-        if (lowerName === 'body press') { atkStatName = 'defense'; } 
-        if (lowerName === 'foul play') { useDefenderAttack = true; } 
-        if (['psyshock', 'psystrike', 'secret sword'].includes(lowerName)) { defStatName = 'defense'; }
+        if (lowerName === 'body-press') { atkStatName = 'defense'; } 
+        if (lowerName === 'foul-play') { useDefenderAttack = true; } 
+        if (['psyshock', 'psystrike', 'secret-sword'].includes(lowerName)) { defStatName = 'defense'; }
+
 
         let rawAtk = useDefenderAttack ? getCalcStat('defender', 'attack') : getCalcStat('attacker', atkStatName); 
         let rawDef = getCalcStat('defender', defStatName);
         let atkStage = useDefenderAttack ? calcState.stages.defender['attack'] : calcState.stages.attacker[atkStatName]; 
         let defStage = calcState.stages.defender[defStatName];
         
+        // --- NEW: ABILITY INTERCEPTIONS (UNAWARE) ---
+        const attackerAbility = calcState.abilities.attacker;
+        const defenderAbility = calcState.abilities.defender;
+
+        // If the defender is Unaware, ignore the attacker's POSITIVE stat changes
+        if (defenderAbility === 'unaware' && atkStage > 0) {
+            atkStage = 0; 
+        }
+        
+        // If the attacker is Unaware, ignore the defender's POSITIVE stat changes
+        if (attackerAbility === 'unaware' && defStage > 0) {
+            defStage = 0; 
+        }
+
         let attackStat = Math.floor(rawAtk * window.getStageMultiplier(atkStage)); 
         let defenseStat = Math.floor(rawDef * window.getStageMultiplier(defStage));
 
@@ -129,8 +144,6 @@ window.calculateDamage = function() {
         // ==========================================
         const attackerItem = calcState.items.attacker;
         const defenderItem = calcState.items.defender;
-        const attackerAbility = calcState.abilities.attacker;
-        const defenderAbility = calcState.abilities.defender;
         const attackerName = calcState.attacker.name; 
 
         if (attackerItem === 'choice-band' && moveData.damage_class === 'physical') attackStat = Math.floor(attackStat * 1.5);
@@ -216,4 +229,16 @@ window.calculateDamage = function() {
         </div>`;
     });
     resultsContainer.innerHTML = html;
+};
+window.resetCalcState = function() {
+    // Reset all combat stages back to 0
+    calcState.stages.attacker = {attack: 0, defense: 0, spAtk: 0, spDef: 0, speed: 0};
+    calcState.stages.defender = {attack: 0, defense: 0, spAtk: 0, spDef: 0, speed: 0};
+    
+    // NOTE: Once you build out the weather/terrain logic, 
+    // you can reset those variables right here!
+    // e.g., calcState.field = { weather: 'none', terrain: 'none' };
+    
+    // Force the UI to repaint
+    if (typeof renderCalcUI === 'function') renderCalcUI();
 };

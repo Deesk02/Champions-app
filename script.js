@@ -2260,15 +2260,31 @@ window.applyMoveBoosts = function(moveName, event) {
         const boosts = getDynamicMoveBoosts(moveData);
         if (!boosts) return;
         
+        const attackerAbility = calcState.abilities.attacker;
+
         for (let stat in boosts) {
+            let change = boosts[stat];
+            
+            // --- ABILITY INTERCEPTIONS ---
+            if (attackerAbility === 'contrary') {
+                change = change * -1; // Reverse it!
+            } else if (attackerAbility === 'simple') {
+                change = change * 2; // Double it!
+            }
+            
             let current = calcState.stages.attacker[stat];
-            current += boosts[stat];
-            if (current > 6) current = 6; if (current < -6) current = -6;
+            current += change;
+            
+            // Cap at +6 or -6
+            if (current > 6) current = 6; 
+            if (current < -6) current = -6;
+            
             calcState.stages.attacker[stat] = current;
         }
         renderCalcUI();
     } catch (err) { alert("Apply boost error: " + err.message); }
 }
+
 
 window.renderCalcUI = function() {
     ['attacker', 'defender'].forEach(role => {
