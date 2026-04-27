@@ -13,6 +13,7 @@ let activeRegulationId = null;
 
 let currentTeam = [null, null, null, null, null, null]; 
 let savedTeams = []; 
+let metaThreats = {}; // NEW: Stores grouped meta builds
 let activeSlotIndex = null; 
 
 let currentDisplayedPokemon = []; 
@@ -120,7 +121,13 @@ window.onload = async () => {
             regulations = Array.isArray(parsed) ? parsed : [];
         }
     } catch (err) { regulations = []; }
-    
+        try {
+        const savedThreatsData = localStorage.getItem('championsMetaThreats'); 
+        if (savedThreatsData) {
+            metaThreats = JSON.parse(savedThreatsData);
+        }
+    } catch (err) { metaThreats = {}; }
+
     try {
         const savedTeamsData = localStorage.getItem('championsSavedTeams'); 
         if (savedTeamsData) {
@@ -1749,34 +1756,134 @@ window.saveCurrentTeam = function() {
     localStorage.setItem('championsSavedTeams', JSON.stringify(savedTeams));
     alert(`"${teamName}" saved successfully!`);
 }
+// ==========================================
+// UNIFIED BUILDS MANAGER (TEAMS & META)
+// ==========================================
+let currentManagerTab = 'teams';
 
-window.openTeamManagerModal = function() { document.getElementById('team-manager-overlay').style.display = 'block'; setTimeout(() => document.getElementById('team-manager-modal').classList.add('open'), 10); renderTeamManagerList(); }
-window.closeTeamManagerModal = function() { document.getElementById('team-manager-modal').classList.remove('open'); setTimeout(() => document.getElementById('team-manager-overlay').style.display = 'none', 300); }
+window.triggerManagerSearch = function() {
+    const term = document.getElementById('manager-search-input').value.toLowerCase().trim();
+    if (currentManagerTab === 'teams') renderManagerTeams(term);
+    if (currentManagerTab === 'meta') renderManagerMeta(term);
+};
 
-function renderTeamManagerList() {
+window.openTeamManagerModal = function() { 
+    document.getElementById('team-manager-overlay').style.display = 'block'; 
+    setTimeout(() => document.getElementById('team-manager-modal').classList.add('open'), 10); 
+    
+    const searchInput = document.getElementById('manager-search-input');
+    if (searchInput) searchInput.value = ''; // Reset search bar on open
+    
+    switchManagerTab(currentManagerTab); 
+};
+
+window.closeTeamManagerModal = function() { 
+    document.getElementById('team-manager-modal').classList.remove('open'); 
+    setTimeout(() => document.getElementById('team-manager-overlay').style.display = 'none', 300); 
+};
+
+window.switchManagerTab = function(tab) {
+    currentManagerTab = tab;
+    ['teams', 'meta'].forEach(t => {
+        document.getElementById(`manager-tab-${t}`).classList.remove('active');
+        document.getElementById(`manager-tab-${t}`).style.background = 'none';
+        document.getElementById(`manager-list-${t}`).style.display = 'none';
+    });
+    
+    document.getElementById(`manager-tab-${tab}`).classList.add('active');
+    document.getElementById(`manager-tab-${tab}`).style.background = '#333';
+    document.getElementById(`manager-list-${tab}`).style.display = 'block';
+    
+    const term = document.getElementById('manager-search-input') ? document.getElementById('manager-search-input').value.toLowerCase().trim() : '';
+    if (tab === 'teams') renderManagerTeams(term);
+    if (tab === 'meta') renderManagerMeta(term);
+};
+
+window.renderManagerTeams = function(searchTerm = '') {
     let html = '';
-    if (savedTeams.length === 0) { html = '<p style="text-align:center; color:#888; margin-top: 30px;">No teams saved yet.</p>'; } 
-    else {
-        savedTeams.forEach((teamObj, idx) => {
+    
+    // Create a shadow array that remembers the original index for safe deletion
+    let filteredTeams = savedTeams.map((team, idx) => ({ ...team, originalIndex: idx }));
+    
+    if (searchTerm) {
+        filteredTeams = filteredTeams.filter(t => {
+            const matchName = t.name.toLowerCase().includes(searchTerm);
+            const matchPkmn = t.team.some(m => m && m.data.name.replace(/-/g, ' ').toLowerCase().includes(searchTerm));
+            return matchName || matchPkmn;
+        });
+    }
+
+    if (filteredTeams.length === 0) { 
+        html = `<p style="text-align:center; color:#888; margin-top: 30px;">${searchTerm ? 'No matches found.' : 'No teams saved yet.'}</p>`; 
+    } else {
+        filteredTeams.forEach((teamObj) => {
+            const originalIdx = teamObj.originalIndex;
             let spritesHtml = teamObj.team.map(m => {
                 if (m) { const spriteName = m.data.spriteId || m.data.name.replace(/[^a-z0-9]/g, ''); return `<img src="https://play.pokemonshowdown.com/sprites/gen5/${spriteName}.png" style="width:35px;height:35px; margin:-5px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8));" onerror="this.src='https://play.pokemonshowdown.com/sprites/gen5/substitute.png'">`; } 
                 else { return `<span style="width:25px; height:35px; display:inline-block;"></span>`; }
             }).join('');
             html += `
             <div style="background: #2a2a2a; border: 1px solid #555; border-radius: 8px; padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="flex-grow: 1; cursor: pointer; padding-right: 10px;" onclick="loadSavedTeam(${idx})">
+                <div style="flex-grow: 1; cursor: pointer; padding-right: 10px;" onclick="loadSavedTeam(${originalIdx})">
                     <div style="font-weight: bold; color: #fff; margin-bottom: 8px; font-size: 16px;">${teamObj.name}</div>
                     <div style="display:flex;">${spritesHtml}</div>
                 </div>
-                <button onclick="deleteSavedTeam(${idx})" style="background: #f44336; color: #fff; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer;">Delete</button>
+                <button onclick="deleteSavedTeam(${originalIdx})" style="background: #f44336; color: #fff; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer;">Delete</button>
             </div>`;
         });
     }
-    document.getElementById('team-manager-list').innerHTML = html;
-}
+    document.getElementById('manager-list-teams').innerHTML = html;
+};
 
-window.loadSavedTeam = function(idx) { currentTeam = JSON.parse(JSON.stringify(savedTeams[idx].team)); document.getElementById('team-name-input').value = savedTeams[idx].name; renderTeamGrid(); closeTeamManagerModal(); }
-window.deleteSavedTeam = function(idx) { if(confirm("Are you sure you want to delete this team?")) { savedTeams.splice(idx, 1); localStorage.setItem('championsSavedTeams', JSON.stringify(savedTeams)); renderTeamManagerList(); } }
+window.renderManagerMeta = function(searchTerm = '') {
+    let html = '';
+    const keys = Object.keys(metaThreats);
+    let totalRendered = 0;
+
+    if (keys.length === 0) {
+        html = '<p style="text-align:center; color:#888; margin-top:30px;">No Meta Threats saved yet.</p>';
+    } else {
+        keys.forEach(key => {
+            const group = metaThreats[key];
+            
+            // Map valid builds and attach their original index for safe deletion/loading
+            let validBuilds = group.builds.map((b, i) => ({build: b, idx: i})).filter(x => x.build !== null);
+            
+            if (searchTerm) {
+                const speciesMatch = group.speciesName.replace(/-/g, ' ').toLowerCase().includes(searchTerm);
+                validBuilds = validBuilds.filter(item => {
+                    return speciesMatch || 
+                           item.build.buildName.toLowerCase().includes(searchTerm) || 
+                           item.build.item.replace(/-/g, ' ').toLowerCase().includes(searchTerm);
+                });
+            }
+
+            if (validBuilds.length > 0) {
+                totalRendered++;
+                html += `<div style="background: #111; padding: 8px 10px; margin-top: 10px; font-weight: bold; border-radius: 5px; text-transform: capitalize; color: #9c27b0;">${group.speciesName.replace(/-/g, ' ')}</div>`;
+                validBuilds.forEach(item => {
+                    const spriteName = item.build.data.spriteId || item.build.data.name.replace(/[^a-z0-9]/g, '');
+                    html += `
+                    <div style="background: #2a2a2a; border: 1px solid #555; border-radius: 8px; padding: 10px; margin-bottom: 10px; margin-top: 5px; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="flex-grow: 1; cursor: pointer; display: flex; align-items: center; gap: 10px;" onclick="loadMetaThreatToTeambuilder('${key}', ${item.idx})">
+                            <img src="https://play.pokemonshowdown.com/sprites/gen5/${spriteName}.png" style="width: 40px; height: 40px;" onerror="this.onerror=null; this.src='https://play.pokemonshowdown.com/sprites/gen5/substitute.png';">
+                            <div>
+                                <div style="font-weight: bold; color: #fff; font-size: 16px;">${item.build.buildName}</div>
+                                <div style="font-size: 12px; color: #aaa; text-transform: capitalize;">${item.build.nature} | ${item.build.item.replace(/-/g, ' ')}</div>
+                            </div>
+                        </div>
+                        <button onclick="deleteMetaThreat('${key}', ${item.idx})" style="background: #f44336; color: #fff; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer;">Delete</button>
+                    </div>`;
+                });
+            }
+        });
+        
+        if (totalRendered === 0 && searchTerm) {
+            html = '<p style="text-align:center; color:#888; margin-top:30px;">No matches found.</p>';
+        }
+    }
+    document.getElementById('manager-list-meta').innerHTML = html;
+};
 
 // ==========================================
 // 9. REGULATIONS MANAGER
@@ -2684,56 +2791,128 @@ window.selectCalcPokemon = function(pokemonName) {
 };
 
 // ==========================================
-// CALCULATOR TEAM IMPORT MODAL
+// CALCULATOR TEAM IMPORT MODAL (UPGRADED)
 // ==========================================
 let calcImportRole = null;
+let currentCalcImportTab = 'active';
 
 window.openCalcTeamImportModal = function(role) {
-    if (currentTeam.length === 0 || !currentTeam[0]) {
-        alert("Your teambuilder is empty! Build a Pokemon on your team before importing.");
-    }
     calcImportRole = role;
     document.getElementById('calc-team-import-modal-overlay').style.display = 'block';
-    
-    let html = '';
-    currentTeam.forEach((member, idx) => {
-        if (member) {
-            const spriteName = member.data.spriteId || member.data.name.replace(/[^a-z0-9]/g, '');
-            html += `
-            <div style="display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 1px solid #444; cursor: pointer;" onclick="window.importToCalcFromTeam(${idx})">
-                <img src="https://play.pokemonshowdown.com/sprites/gen5/${spriteName}.png" style="width: 40px; height: 40px;" onerror="this.onerror=null; this.src='https://play.pokemonshowdown.com/sprites/gen5/substitute.png';">
-                <div style="font-weight: bold; text-transform: capitalize; color: #fff; font-size: 16px;">${member.data.name.replace(/-/g, ' ')}</div>
-            </div>`;
-        }
-    });
-    document.getElementById('calc-team-import-list').innerHTML = html;
+    switchCalcImportTab(currentCalcImportTab);
 };
 
 window.closeCalcTeamImportModal = function() {
-    document.getElementById('calc-team-import-modal').classList.remove('open');
-    setTimeout(() => document.getElementById('calc-team-import-modal-overlay').style.display = 'none', 300);
+    document.getElementById('calc-team-import-modal-overlay').style.display = 'none';
 };
 
-window.importToCalcFromTeam = function(slotIdx) {
-    const member = currentTeam[slotIdx];
+window.switchCalcImportTab = function(tab) {
+    currentCalcImportTab = tab;
+    ['active', 'saved', 'meta'].forEach(t => {
+        document.getElementById(`calc-import-tab-${t}`).classList.remove('active');
+        document.getElementById(`calc-import-tab-${t}`).style.background = 'none';
+        document.getElementById(`calc-import-list-${t}`).style.display = 'none';
+    });
+    
+    document.getElementById(`calc-import-tab-${tab}`).classList.add('active');
+    document.getElementById(`calc-import-tab-${tab}`).style.background = '#333';
+    document.getElementById(`calc-import-list-${tab}`).style.display = 'block';
+    
+    if (tab === 'active') renderCalcImportActive();
+    if (tab === 'saved') renderCalcImportSaved();
+    if (tab === 'meta') renderCalcImportMeta();
+};
+
+function generateImportRowHTML(member, onClickAction, customSubtitle = null) {
+    const spriteName = member.data.spriteId || member.data.name.replace(/[^a-z0-9]/g, '');
+    const subtitle = customSubtitle || `${member.nature.charAt(0).toUpperCase() + member.nature.slice(1)} | ${member.item.replace(/-/g, ' ')}`;
+    return `
+    <div style="display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 1px solid #444; cursor: pointer; background: #2a2a2a; margin-bottom: 5px; border-radius: 8px;" onclick="${onClickAction}">
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/${spriteName}.png" style="width: 40px; height: 40px;" onerror="this.onerror=null; this.src='https://play.pokemonshowdown.com/sprites/gen5/substitute.png';">
+        <div style="flex-grow: 1;">
+            <div style="font-weight: bold; text-transform: capitalize; color: #fff; font-size: 16px;">${member.data.name.replace(/-/g, ' ')}</div>
+            <div style="font-size: 12px; color: #aaa; text-transform: capitalize;">${subtitle}</div>
+        </div>
+        <div style="color: #4CAF50; font-size: 20px; font-weight: bold;">+</div>
+    </div>`;
+}
+
+window.renderCalcImportActive = function() {
+    let html = '';
+    if (currentTeam.length === 0 || currentTeam.every(m => m === null)) {
+        html = '<p style="text-align:center; color:#888; margin-top:20px;">Active team is empty.</p>';
+    } else {
+        currentTeam.forEach((member, idx) => {
+            if (member) html += generateImportRowHTML(member, `importToCalcFromSource('active', ${idx})`);
+        });
+    }
+    document.getElementById('calc-import-list-active').innerHTML = html;
+};
+
+window.renderCalcImportSaved = function() {
+    let html = '';
+    if (savedTeams.length === 0) {
+        html = '<p style="text-align:center; color:#888; margin-top:20px;">No saved teams yet.</p>';
+    } else {
+        savedTeams.forEach((teamObj, tIdx) => {
+            html += `<div style="background: #111; padding: 8px 10px; margin-top: 10px; font-weight: bold; border-radius: 5px; color: #2196F3;">${teamObj.name}</div>`;
+            teamObj.team.forEach((member, mIdx) => {
+                if (member) html += generateImportRowHTML(member, `importToCalcFromSource('saved', ${tIdx}, ${mIdx})`);
+            });
+        });
+    }
+    document.getElementById('calc-import-list-saved').innerHTML = html;
+};
+
+window.renderCalcImportMeta = function() {
+    let html = '';
+    const keys = Object.keys(metaThreats);
+    if (keys.length === 0) {
+        html = '<p style="text-align:center; color:#888; margin-top:20px;">No Meta Threats saved yet.</p>';
+    } else {
+        keys.forEach(key => {
+            const group = metaThreats[key];
+            const validBuilds = group.builds.map((b, i) => ({build: b, idx: i})).filter(x => x.build !== null);
+            
+            if (validBuilds.length > 0) {
+                html += `<div style="background: #111; padding: 8px 10px; margin-top: 10px; font-weight: bold; border-radius: 5px; text-transform: capitalize; color: #9c27b0;">${group.speciesName.replace(/-/g, ' ')}</div>`;
+                validBuilds.forEach(item => {
+                    html += generateImportRowHTML(item.build, `importToCalcFromSource('meta', '${key}', ${item.idx})`, item.build.buildName);
+                });
+            }
+        });
+    }
+    document.getElementById('calc-import-list-meta').innerHTML = html;
+};
+
+window.importToCalcFromSource = function(sourceType, param1, param2) {
+    let member = null;
+    if (sourceType === 'active') member = currentTeam[param1];
+    if (sourceType === 'saved') member = savedTeams[param1].team[param2];
+    if (sourceType === 'meta') member = metaThreats[param1].builds[param2];
+
     if (member) {
         calcState[calcImportRole] = member.data; 
-        calcState.sp[calcImportRole] = member.sp ? { ...member.sp } : {hp:0, attack:0, defense:0, spAtk:0, spDef:0, speed:0}; 
+        
+        // Use JSON clone to ensure we don't accidentally mutate the saved threat's SP when tinkering in the calc!
+        calcState.sp[calcImportRole] = member.sp ? JSON.parse(JSON.stringify(member.sp)) : {hp:0, attack:0, defense:0, spAtk:0, spDef:0, speed:0}; 
         calcState.natures[calcImportRole] = member.nature || 'serious'; 
         calcState.stages[calcImportRole] = {attack:0, defense:0, spAtk:0, spDef:0, speed:0};
         
-        // FORMAT STRINGS TO MATCH DROPDOWN IDs:
         let safeAbility = member.ability ? member.ability.replace(/ /g, '-').toLowerCase() : 'None';
         let safeItem = member.item ? member.item.replace(/ /g, '-').toLowerCase() : 'None';
         
         calcState.abilities[calcImportRole] = safeAbility;
         calcState.items[calcImportRole] = safeItem;
 
-        if (calcImportRole === 'attacker') calcState.attackerMoves = [...member.moves]; else calcState.defenderMoves = [...member.moves];
+        if (calcImportRole === 'attacker') calcState.attackerMoves = [...member.moves]; 
+        else calcState.defenderMoves = [...member.moves];
+        
         renderCalcUI(); 
-        window.closeCalcTeamImportModal();
+        closeCalcTeamImportModal();
     }
 };
+
 // ==========================================
 // CALCULATOR ITEM SELECTION MODAL
 // ==========================================
@@ -2945,3 +3124,62 @@ const calcMoveSearch = document.getElementById('calc-move-search');
 if (calcMoveSearch) {
     calcMoveSearch.addEventListener('input', (e) => { window.renderCalcMoveList(e.target.value.toLowerCase().trim()); });
 }
+// ==========================================
+// 14. META THREAT ENGINE
+// ==========================================
+
+window.openMetaThreatSaveModal = function() {
+    document.getElementById('meta-threat-save-overlay').style.display = 'block';
+    setTimeout(() => document.getElementById('meta-threat-save-modal').classList.add('open'), 10);
+    document.getElementById('meta-threat-name-input').value = '';
+};
+
+window.closeMetaThreatSaveModal = function() {
+    document.getElementById('meta-threat-save-modal').classList.remove('open');
+    setTimeout(() => document.getElementById('meta-threat-save-overlay').style.display = 'none', 300);
+};
+
+window.executeSaveMetaThreat = function() {
+    if (editingSlotIndex === null) return;
+    
+    // Grab the current unsaved state from the modal UI directly, 
+    // ensuring we save exactly what the user is looking at.
+    const member = currentTeam[editingSlotIndex];
+    if (!member) return;
+
+    // Apply the active dropdowns from the edit modal to the object
+    member.ability = document.getElementById('edit-ability').value;
+    member.nature = document.getElementById('edit-nature').value;
+
+    const buildName = document.getElementById('meta-threat-name-input').value.trim() || "Standard Build";
+    
+    // Group by baseId so Megas, Alolans, and base forms all sit in the same folder
+    const groupKey = member.data.baseId || member.data.id;
+
+    if (!metaThreats[groupKey]) {
+        // Initialize an empty 6-slot array just like a Teambuilder team!
+        metaThreats[groupKey] = {
+            speciesName: member.data.speciesName || member.data.name,
+            builds: [null, null, null, null, null, null]
+        };
+    }
+
+    // Find the first empty slot in this Pokémon's group
+    const emptyIndex = metaThreats[groupKey].builds.findIndex(b => b === null);
+    
+    if (emptyIndex === -1) {
+        alert("You already have 6 builds saved for this Pokémon! You must delete one before adding another.");
+        return;
+    }
+
+    // Create a deep clone so future edits to the teambuilder don't mutate the saved threat
+    const buildToSave = JSON.parse(JSON.stringify(member));
+    buildToSave.buildName = buildName; // Attach the custom tag
+
+    // Save to memory and LocalStorage
+    metaThreats[groupKey].builds[emptyIndex] = buildToSave;
+    localStorage.setItem('championsMetaThreats', JSON.stringify(metaThreats));
+    
+    alert(`"${buildName}" saved successfully under ${metaThreats[groupKey].speciesName.replace(/-/g, ' ').toUpperCase()}!`);
+    closeMetaThreatSaveModal();
+};

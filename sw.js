@@ -4,8 +4,11 @@ const ASSETS_TO_CACHE = [
   './index.html',
   './style.css',
   './script.js',
-  './manifest.json',
-  './calculator.js' // Added this since it's crucial for offline math!
+  './moves-data.js',
+  './abilities.js',
+  './items.js',
+  './calculator.js',
+  './manifest.json'
 ];
 // Install Event - Caches the files
 self.addEventListener('install', event => {
